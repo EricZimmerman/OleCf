@@ -5,6 +5,8 @@ VisualStudioVersion = 14.0.25008.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OleCf", "OleCf\OleCf.csproj", "{C2B1CBC2-7109-44C6-A4A6-D6A71B6E8579}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OleCf.Test", "OleCf.Test\OleCf.Test.csproj", "{7088E754-DB90-4BCE-9F0C-94779337E7F2}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +17,10 @@ Global
 		{C2B1CBC2-7109-44C6-A4A6-D6A71B6E8579}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C2B1CBC2-7109-44C6-A4A6-D6A71B6E8579}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C2B1CBC2-7109-44C6-A4A6-D6A71B6E8579}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7088E754-DB90-4BCE-9F0C-94779337E7F2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7088E754-DB90-4BCE-9F0C-94779337E7F2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7088E754-DB90-4BCE-9F0C-94779337E7F2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7088E754-DB90-4BCE-9F0C-94779337E7F2}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
