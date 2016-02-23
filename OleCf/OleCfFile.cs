@@ -112,7 +112,7 @@ namespace OleCf
             {
                 var destBytes = GetPayloadForDirectory(destList);
 
-                DestList = new DestList(destBytes);
+              DestList = new DestList(destBytes);
             }
         }
 

@@ -22,24 +22,34 @@ namespace OleCf
 
             Header = new DestListHeader(headerBytes);
 
-          var index = 32;
-
-          while (index < rawBytes.Length)
+          if (Header.Version == 1)
           {
+                var index = 32;
 
-                var pathSize = BitConverter.ToInt16(rawBytes, index + 112);
-                //now that we know pathSize we can determine how big each record is
-                var entrySize = 114 + (pathSize * 2);
+                while (index < rawBytes.Length)
+                {
 
-              var entryBytes = new byte[entrySize];
-                Buffer.BlockCopy(rawBytes,index,entryBytes,0,entrySize);
+                    var pathSize = BitConverter.ToInt16(rawBytes, index + 112);
+                    //now that we know pathSize we can determine how big each record is
+                    var entrySize = 114 + (pathSize * 2);
 
-                var entry = new DestListEntry(entryBytes);
+                    var entryBytes = new byte[entrySize];
+                    Buffer.BlockCopy(rawBytes, index, entryBytes, 0, entrySize);
 
-                Entries.Add(entry);
+                    var entry = new DestListEntry(entryBytes);
 
-              index += entrySize;
+                    Entries.Add(entry);
+
+                    index += entrySize;
+                }
+            }
+          else
+          {
+            //windows 10 has version 3              
+
+
           }
+
 
           Debug.WriteLine(1);
 

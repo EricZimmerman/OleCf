@@ -24,7 +24,7 @@ namespace OleCf.Test
             //            names.Add(@"C:\Users\e\AppData\Roaming\Microsoft\Windows\Recent\AutomaticDestinations\b842d0b8aaf85331.automaticDestinations-ms");
             //            names.Add(@"C:\Users\e\AppData\Roaming\Microsoft\Windows\Recent\AutomaticDestinations\ecf56f5453131993.automaticDestinations-ms");
 
-         //   names.Add(@"C:\Users\e\AppData\Roaming\Microsoft\Windows\Recent\AutomaticDestinations\5f7b5f1e01b83767.automaticDestinations-ms");
+            names.Add(@"C:\Users\e\AppData\Roaming\Microsoft\Windows\Recent\AutomaticDestinations\5f7b5f1e01b83767.automaticDestinations-ms");
 //            names.Add(@"C:\Users\e\AppData\Roaming\Microsoft\Windows\Recent\AutomaticDestinations\9fda41b86ddcf1db.automaticDestinations-ms");
 //            names.Add(@"C:\Users\e\AppData\Roaming\Microsoft\Windows\Recent\AutomaticDestinations\f01b4d95cf55d32a.automaticDestinations-ms");
 //            names.Add(@"C:\Users\e\AppData\Roaming\Microsoft\Windows\Recent\AutomaticDestinations\16d71406474462b5.automaticDestinations-ms");
