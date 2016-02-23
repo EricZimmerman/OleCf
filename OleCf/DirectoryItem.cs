@@ -45,14 +45,24 @@ namespace OleCf
             CreationTime = DateTimeOffset.FromFileTime(BitConverter.ToInt64(rawBytes, 100)).ToUniversalTime();
             ModifiedTime = DateTimeOffset.FromFileTime(BitConverter.ToInt64(rawBytes, 108)).ToUniversalTime();
 
+            if (CreationTime.Value.Year == 1601)
+            {
+                CreationTime = null;
+            }
+
+            if (ModifiedTime.Value.Year == 1601)
+            {
+                ModifiedTime = null;
+            }
+
             FirstDirectorySectorId = BitConverter.ToUInt32(rawBytes, 116);
             DirectorySize = BitConverter.ToInt32(rawBytes, 120);
         }
 
         public Guid ClassId { get; }
         public uint UserFlags { get; }
-        public DateTimeOffset CreationTime { get; }
-        public DateTimeOffset ModifiedTime { get; }
+        public DateTimeOffset? CreationTime { get; }
+        public DateTimeOffset? ModifiedTime { get; }
         public uint FirstDirectorySectorId { get; }
         public int DirectorySize { get; }
         public int PreviousDirectoryId { get; }

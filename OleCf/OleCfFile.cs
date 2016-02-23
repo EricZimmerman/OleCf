@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
 using System.Linq;
 
 namespace OleCf
@@ -112,30 +110,8 @@ namespace OleCf
             {
                 var destBytes = GetPayloadForDirectory(destList);
 
-              DestList = new DestList(destBytes);
+                DestList = new DestList(destBytes);
             }
-        }
-
-        public byte[] GetPayloadForDirectory(DirectoryItem dir)
-        {
-            byte[] payLoadBytes = null;
-
-            if (dir.DirectorySize > Header.MinimumStandardStreamSize)
-            {
-                var b = GetDataFromSat((int)dir.FirstDirectorySectorId);
-
-                payLoadBytes = new byte[dir.DirectorySize];
-                Buffer.BlockCopy(b, 0, payLoadBytes, 0, dir.DirectorySize);
-            }
-            else
-            {
-                var b = GetDataFromSSat((int)dir.FirstDirectorySectorId);
-
-                payLoadBytes = new byte[dir.DirectorySize];
-                Buffer.BlockCopy(b, 0, payLoadBytes, 0, dir.DirectorySize);
-            }
-
-            return payLoadBytes;
         }
 
         public Header Header { get; }
@@ -146,6 +122,28 @@ namespace OleCf
 
         public string SourceFile { get; }
 
+        public byte[] GetPayloadForDirectory(DirectoryItem dir)
+        {
+            byte[] payLoadBytes = null;
+
+            if (dir.DirectorySize > Header.MinimumStandardStreamSize)
+            {
+                var b = GetDataFromSat((int) dir.FirstDirectorySectorId);
+
+                payLoadBytes = new byte[dir.DirectorySize];
+                Buffer.BlockCopy(b, 0, payLoadBytes, 0, dir.DirectorySize);
+            }
+            else
+            {
+                var b = GetDataFromSSat((int) dir.FirstDirectorySectorId);
+
+                payLoadBytes = new byte[dir.DirectorySize];
+                Buffer.BlockCopy(b, 0, payLoadBytes, 0, dir.DirectorySize);
+            }
+
+            return payLoadBytes;
+        }
+
         private byte[] GetDataFromSat(int sectorNumber)
         {
             var sn = sectorNumber;
@@ -155,7 +153,7 @@ namespace OleCf
             runInfo.Add(sectorNumber);
 
             var sectorSize = Header.SectorSizeAsBytes;
-            
+
             while (Sat[sn] >= 0)
             {
                 runInfo.Add(Sat[sn]);
