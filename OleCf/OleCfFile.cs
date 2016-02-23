@@ -45,7 +45,9 @@ namespace OleCf
             }
 
             //Just as with the SAT, but this time, with the SmallSectorAllocationTable
-            var ssatbytes = GetDataFromSat(Header.SSATFirstSectorId);
+            if (Header.SSATFirstSectorId != -2)
+            {
+                var ssatbytes = GetDataFromSat(Header.SSATFirstSectorId);
 
             SSat = new int[ssatbytes.Length/4];
 
@@ -54,6 +56,12 @@ namespace OleCf
                 var ssatAddr = BitConverter.ToInt32(ssatbytes, i*4);
                 SSat[i] = ssatAddr;
             }
+            }
+            else
+            {
+                
+            }
+            
 
             //build our directory items
             //first, get all the bytes we need
@@ -87,7 +95,7 @@ namespace OleCf
             _shortSectors = new List<byte[]>();
 
             var rootDir = DirectoryItems.SingleOrDefault(t => t.DirectoryName.ToLowerInvariant() == "root entry");
-            if (rootDir != null)
+            if (rootDir != null && rootDir.DirectorySize>0)
             {
                 var b = GetDataFromSat((int) rootDir.FirstDirectorySectorId);
 
@@ -106,7 +114,7 @@ namespace OleCf
             }
 
             var destList = DirectoryItems.SingleOrDefault(t => t.DirectoryName.ToLowerInvariant() == "destlist");
-            if (destList != null)
+            if (destList != null && destList.DirectorySize>0)
             {
                 var destBytes = GetPayloadForDirectory(destList);
 

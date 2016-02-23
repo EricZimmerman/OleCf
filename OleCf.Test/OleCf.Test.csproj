@@ -57,10 +57,15 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
+    <None Include="TestFiles\Bad\CALC.EXE-3FBEF7FD.pf" />
+    <None Include="TestFiles\Win10\5f7b5f1e01b83767.automaticDestinations-ms" />
+    <None Include="TestFiles\Win10\7e4dca80246863e3.automaticDestinations-ms" />
+    <None Include="TestFiles\Win10\f01b4d95cf55d32a.automaticDestinations-ms" />
+    <None Include="TestFiles\Win7\1b4dd67f29cb1962.automaticDestinations-ms" />
+    <None Include="TestFiles\Win80\f01b4d95cf55d32a.automaticDestinations-ms" />
+    <None Include="TestFiles\Win81\f01b4d95cf55d32a.automaticDestinations-ms" />
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="TestFiles\Win10\" />
-  </ItemGroup>
+  <ItemGroup />
   <ItemGroup>
     <ProjectReference Include="..\OleCf\OleCf.csproj">
       <Project>{c2b1cbc2-7109-44c6-a4a6-d6a71b6e8579}</Project>
