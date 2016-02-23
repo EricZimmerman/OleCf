@@ -10,6 +10,7 @@ namespace OleCf
     {
         private readonly byte[] _rawBytes;
         private readonly List<byte[]> _shortSectors;
+        public DestList DestList;
 
         public OleCfFile(byte[] rawBytes, string sourceFile)
         {
@@ -21,36 +22,31 @@ namespace OleCf
 
             Header = new Header(headerBytes);
 
-
+            //We need to get all the bytes that make up the SectorAllocationTable
+            //start with empty array to hold our bytes
             var satbytes = new byte[Header.TotalSATSectors*Header.SectorSizeAsBytes];
 
+            //fill the bytes
             for (var i = 0; i < Header.SATSectors.Length; i++)
             {
-                //go to offset stored at i
-                //get sectorsizebytes
-                //copy to satbytes
-
                 var satChunk = new byte[Header.SectorSizeAsBytes];
                 Buffer.BlockCopy(rawBytes, Header.SATSectors[i], satChunk, 0, Header.SectorSizeAsBytes);
-
-                //   Debug.WriteLine($"satChunk sig: {BitConverter.ToInt32(satChunk,0)}");
 
                 Buffer.BlockCopy(satChunk, 0, satbytes, i*Header.SectorSizeAsBytes, Header.SectorSizeAsBytes);
             }
 
+            //satbytes now contains a bunch of bytes we need to convert to signed ints which will act as our map to different sectors
+            //ints are 4 bytes each
             Sat = new int[satbytes.Length/4];
 
-            //Debug.WriteLine(BitConverter.ToString(satbytes));
-
+            //fill the Sat
             for (var i = 0; i < satbytes.Length/4; i++)
             {
                 var satAddr = BitConverter.ToInt32(satbytes, i*4);
                 Sat[i] = satAddr;
             }
 
-
-            // DumpSat();
-
+            //Just as with the SAT, but this time, with the SmallSectorAllocationTable
             var ssatbytes = GetDataFromSat(Header.SSATFirstSectorId);
 
             SSat = new int[ssatbytes.Length/4];
@@ -61,16 +57,15 @@ namespace OleCf
                 SSat[i] = ssatAddr;
             }
 
-            //  DumpSSat();
-
+            //build our directory items
+            //first, get all the bytes we need
             var dirBytes = GetDataFromSat(Header.DirectoryStreamFirstSectorId);
-
-            //Buffer.BlockCopy(rawBytes,(Header.DirectoryStreamFirstSectorId * Header.SectorSizeAsBytes)+512,dirBytes,0,Header.SectorSizeAsBytes);
 
             var dirIndex = 0;
 
             DirectoryItems = new List<DirectoryItem>();
 
+            //process all directories
             while (dirIndex < dirBytes.Length)
             {
                 var dBytes = new byte[128];
@@ -88,8 +83,9 @@ namespace OleCf
             }
 
 
-            //the Root Entry directory item contains all the sectors we need for short sector stuff, so get the data and cut it up so we can use it later
+            //the Root Entry directory item contains all the sectors we need for small sector stuff, so get the data and cut it up so we can use it later
 
+            //when we are done we will have a list of byte arrays, each 64 bytes long, that we can string together later based on SSAT
             _shortSectors = new List<byte[]>();
 
             var rootDir = DirectoryItems.SingleOrDefault(t => t.DirectoryName.ToLowerInvariant() == "root entry");
@@ -97,9 +93,7 @@ namespace OleCf
             {
                 var b = GetDataFromSat((int) rootDir.FirstDirectorySectorId);
 
-
                 var shortIndex = 0;
-                var shortCounter = 0;
 
                 while (shortIndex < b.Length)
                 {
@@ -110,69 +104,38 @@ namespace OleCf
                     _shortSectors.Add(shortChunk);
 
                     shortIndex += 64;
-                    shortCounter += 1;
                 }
             }
 
-
-            Debug.WriteLine(DirectoryItems.Count);
-
-
-            foreach (var directoryItem in DirectoryItems)
+            var destList = DirectoryItems.SingleOrDefault(t => t.DirectoryName.ToLowerInvariant() == "destlist");
+            if (destList != null)
             {
-                if (directoryItem.DirectoryName.ToLowerInvariant() == "root entry")
-                {
-                    continue;
-                }
+                var destBytes = GetPayloadForDirectory(destList);
 
-                Debug.WriteLine($"Name: {directoryItem.DirectoryName}, Size: {directoryItem.DirectorySize}");
-
-                if (directoryItem.DirectoryName == "d")
-                    Debug.WriteLine(1);
-
-
-                byte[] payLoadBytes = null;
-
-                if (directoryItem.DirectorySize > Header.MinimumStandardStreamSize)
-                {
-                    var b = GetDataFromSat((int) directoryItem.FirstDirectorySectorId);
-
-                    payLoadBytes = new byte[directoryItem.DirectorySize];
-                    Buffer.BlockCopy(b, 0, payLoadBytes, 0, directoryItem.DirectorySize);
-                }
-                else
-                {
-                    var b = GetDataFromSSat((int) directoryItem.FirstDirectorySectorId);
-
-                    payLoadBytes = new byte[directoryItem.DirectorySize];
-                    Buffer.BlockCopy(b, 0, payLoadBytes, 0, directoryItem.DirectorySize);
-                }
-
-                var ddd = Path.GetFileNameWithoutExtension(sourceFile);
-                var basePath = Path.Combine(@"C:\temp", ddd);
-                if (Directory.Exists(basePath))
-                {
-                    try
-                    {
-                        Directory.Delete(basePath);
-                    }
-                    catch (Exception)
-                    {
-                    }
-                }
-
-                Directory.CreateDirectory(basePath);
-
-                var rf = Path.Combine(@"C:\temp\", basePath, directoryItem.DirectoryName + ".lnk.test");
-
-
-                if (payLoadBytes[0] == 0x4c)
-                {
-                    File.WriteAllBytes(rf, payLoadBytes);
-                }
-
-                
+                DestList = new DestList(destBytes);
             }
+        }
+
+        public byte[] GetPayloadForDirectory(DirectoryItem dir)
+        {
+            byte[] payLoadBytes = null;
+
+            if (dir.DirectorySize > Header.MinimumStandardStreamSize)
+            {
+                var b = GetDataFromSat((int)dir.FirstDirectorySectorId);
+
+                payLoadBytes = new byte[dir.DirectorySize];
+                Buffer.BlockCopy(b, 0, payLoadBytes, 0, dir.DirectorySize);
+            }
+            else
+            {
+                var b = GetDataFromSSat((int)dir.FirstDirectorySectorId);
+
+                payLoadBytes = new byte[dir.DirectorySize];
+                Buffer.BlockCopy(b, 0, payLoadBytes, 0, dir.DirectorySize);
+            }
+
+            return payLoadBytes;
         }
 
         public Header Header { get; }
@@ -183,26 +146,6 @@ namespace OleCf
 
         public string SourceFile { get; }
 
-        private void DumpSat()
-        {
-            Debug.WriteLine("SAT");
-            for (var i = 0; i < Sat.Length; i++)
-            {
-                Debug.WriteLine($"Slot {i}: {Sat[i]}");
-            }
-            Debug.WriteLine("----------------");
-        }
-
-        private void DumpSSat()
-        {
-            Debug.WriteLine("SSAT");
-            for (var i = 0; i < SSat.Length; i++)
-            {
-                Debug.WriteLine($"SSlot {i}: {SSat[i]}");
-            }
-            Debug.WriteLine("----------------");
-        }
-
         private byte[] GetDataFromSat(int sectorNumber)
         {
             var sn = sectorNumber;
@@ -211,34 +154,29 @@ namespace OleCf
 
             runInfo.Add(sectorNumber);
 
-            var _sectorSize = Header.SectorSizeAsBytes;
-
-
+            var sectorSize = Header.SectorSizeAsBytes;
+            
             while (Sat[sn] >= 0)
             {
                 runInfo.Add(Sat[sn]);
                 sn = Sat[sn];
             }
 
-            //  Debug.WriteLine($"Run info len: {runInfo.Count}");
-
-            //this needs to handle short sectors too
-
-            var retBytes = new byte[_sectorSize*runInfo.Count];
+            var retBytes = new byte[sectorSize*runInfo.Count];
 
             var offset = 0;
             foreach (var i in runInfo)
             {
-                var index = 512 + _sectorSize*i; //header + relative offset
+                var index = 512 + sectorSize*i; //header + relative offset
 
-                var readSize = _sectorSize;
+                var readSize = sectorSize;
 
-                if (_rawBytes.Length - index < _sectorSize)
+                if (_rawBytes.Length - index < sectorSize)
                 {
                     readSize = _rawBytes.Length - index;
                 }
 
-                Buffer.BlockCopy(_rawBytes, index, retBytes, _sectorSize*offset, readSize);
+                Buffer.BlockCopy(_rawBytes, index, retBytes, sectorSize*offset, readSize);
                 offset += 1;
             }
 
@@ -253,24 +191,21 @@ namespace OleCf
 
             runInfo.Add(sectorNumber);
 
-            var _sectorSize = Header.ShortSectorSizeAsBytes;
+            var sectorSize = Header.ShortSectorSizeAsBytes;
 
             while (SSat[sn] >= 0)
             {
-                //    Debug.WriteLine($"{Sat[sn]} 0x{Sat[sn]:x}");
-
                 runInfo.Add(SSat[sn]);
 
                 sn = SSat[sn];
             }
 
-
-            var retBytes = new byte[_sectorSize*runInfo.Count];
+            var retBytes = new byte[sectorSize*runInfo.Count];
 
             var offset = 0;
             foreach (var i in runInfo)
             {
-                Buffer.BlockCopy(_shortSectors[i], 0, retBytes, _sectorSize*offset, _sectorSize);
+                Buffer.BlockCopy(_shortSectors[i], 0, retBytes, sectorSize*offset, sectorSize);
                 offset += 1;
             }
 

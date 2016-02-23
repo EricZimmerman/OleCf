@@ -36,7 +36,6 @@ namespace OleCf
             SectorSize = BitConverter.ToInt16(rawBytes, 30);
             ShortSectorSize = BitConverter.ToInt16(rawBytes, 32);
 
-
             TotalSATSectors = BitConverter.ToInt32(rawBytes, 44);
             DirectoryStreamFirstSectorId = BitConverter.ToInt32(rawBytes, 48);
             MinimumStandardStreamSize = BitConverter.ToUInt32(rawBytes, 56);
@@ -62,7 +61,7 @@ namespace OleCf
                 {
                     SATSectors[i] = BitConverter.ToInt32(sectorId, 0)*SectorSizeAsBytes + 512; // 512 is for the header
                 }
-                
+
                 SectorIds.Add(sectorId);
             }
         }
@@ -79,7 +78,7 @@ namespace OleCf
 
         public short ShortSectorSize { get; }
 
-        public int ShortSectorSizeAsBytes => (int)Math.Pow(2, ShortSectorSize);
+        public int ShortSectorSizeAsBytes => (int) Math.Pow(2, ShortSectorSize);
 
 
         public int TotalSATSectors { get; }
@@ -133,7 +132,7 @@ namespace OleCf
                 if (val > -1)
                 {
                     sb.AppendLine(
-                        $"Sector #{i}: {BitConverter.ToString(sectorId)} ({val}) Offset: {512 + val*Math.Pow(2, SectorSize)}");
+                        $"Sector #{i}: {BitConverter.ToString(sectorId)} ({val}) Absolute Offset: {512 + val*Math.Pow(2, SectorSize)}");
                 }
 
                 i += 1;

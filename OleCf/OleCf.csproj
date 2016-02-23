@@ -40,6 +40,9 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="DestList.cs" />
+    <Compile Include="DestListEntry.cs" />
+    <Compile Include="DestListHeader.cs" />
     <Compile Include="DirectoryItem.cs" />
     <Compile Include="Header.cs" />
     <Compile Include="OleCf.cs" />
