@@ -20,11 +20,11 @@ namespace OleCf
         public int PinStatus;
         public string Path;
 
-        public DestListEntry(byte[] rawBytes)
+        public DestListEntry(byte[] rawBytes, int version)
         {
             Checksum = BitConverter.ToInt64(rawBytes, 0);
 
-          var  volDroidBytes = new byte[16];
+            var  volDroidBytes = new byte[16];
             Buffer.BlockCopy(rawBytes, 8, volDroidBytes, 0, 16);
 
             VolumeDroid = new Guid(volDroidBytes);
@@ -54,11 +54,18 @@ namespace OleCf
 
             PinStatus = BitConverter.ToInt32(rawBytes, 108);
 
+            if (version == 3)
+            {
 
-            //at offset 112 is the size of the path found at offset 114
-            var pathSize = BitConverter.ToInt16(rawBytes, 112);
+                Path = Encoding.Unicode.GetString(rawBytes, 128, rawBytes.Length - 128);
+            }
+            else
+            {
 
-            Path = Encoding.Unicode.GetString(rawBytes, 114,rawBytes.Length - 114);
+                Path = Encoding.Unicode.GetString(rawBytes, 114, rawBytes.Length - 114);
+            }
+
+            
         }
 
         public override string ToString()

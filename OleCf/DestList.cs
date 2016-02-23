@@ -22,37 +22,53 @@ namespace OleCf
 
             Header = new DestListHeader(headerBytes);
 
-          if (Header.Version == 1)
-          {
-                var index = 32;
+            var index = 32;
+          var pathSize = 0;
+          var entrySize = 0;
+
+            if (Header.Version == 1)
+            {
+                index = 32;
 
                 while (index < rawBytes.Length)
                 {
-
-                    var pathSize = BitConverter.ToInt16(rawBytes, index + 112);
+                    pathSize = BitConverter.ToInt16(rawBytes, index + 112);
                     //now that we know pathSize we can determine how big each record is
-                    var entrySize = 114 + (pathSize * 2);
+                    entrySize = 114 + (pathSize * 2);
 
-                    var entryBytes = new byte[entrySize];
-                    Buffer.BlockCopy(rawBytes, index, entryBytes, 0, entrySize);
+                    var entryBytes1 = new byte[entrySize];
+                    Buffer.BlockCopy(rawBytes, index, entryBytes1, 0, entrySize);
 
-                    var entry = new DestListEntry(entryBytes);
+                    var entry1 = new DestListEntry(entryBytes1,Header.Version);
 
-                    Entries.Add(entry);
+                    Entries.Add(entry1);
 
                     index += entrySize;
                 }
             }
           else
           {
-            //windows 10 has version 3              
+                //windows 10 has version 3              
 
+                 index = 32;
 
-          }
+                while (index < rawBytes.Length)
+                {
+                    pathSize = BitConverter.ToInt16(rawBytes, index + 128);
+                    //now that we know pathSize we can determine how big each record is
+                    entrySize = 128 + 2 + (pathSize * 2) + 4; //128 is offset to the string, 2 for the size itself, double path for unicode, then 4 extra at the end
 
+                    var entryBytes2 = new byte[entrySize];
+                    Buffer.BlockCopy(rawBytes, index, entryBytes2, 0, entrySize);
 
-          Debug.WriteLine(1);
+                    var entry2 = new DestListEntry(entryBytes2, Header.Version);
 
+                    Entries.Add(entry2);
+
+                    index += entrySize;
+                }
+
+            }
 
       }
     }
