@@ -23,10 +23,10 @@ namespace OleCf
 
         public DirectoryItem(byte[] rawBytes)
         {
-            var _dirLen = (int) BitConverter.ToInt16(rawBytes, 64); // includes null terminator
-            _dirLen = _dirLen - 2;
+            var dirLen = (int) BitConverter.ToInt16(rawBytes, 64); // includes null terminator
+            dirLen = dirLen - 2;
 
-            DirectoryName = Encoding.Unicode.GetString(rawBytes, 0, _dirLen);
+            DirectoryName = Encoding.Unicode.GetString(rawBytes, 0, dirLen);
 
             DirectoryType = (DirectoryEntryTypes) rawBytes[66];
             NodeColor = (NodeColors) rawBytes[67];

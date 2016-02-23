@@ -80,7 +80,6 @@ namespace OleCf
 
         public int ShortSectorSizeAsBytes => (int) Math.Pow(2, ShortSectorSize);
 
-
         public int TotalSATSectors { get; }
         public int DirectoryStreamFirstSectorId { get; }
 

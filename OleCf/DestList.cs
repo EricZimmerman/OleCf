@@ -1,10 +1,28 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Text;
 
 namespace OleCf
 {
     public class DestList
     {
+        public override string ToString()
+        {
+            var sb = new StringBuilder();
+
+            sb.AppendLine($"Header: {Header}");
+
+
+            sb.AppendLine("");
+            sb.AppendLine("Dest Lists");
+            foreach (var destListEntry in Entries)
+            {
+                sb.AppendLine(destListEntry.ToString());
+            }
+
+            return sb.ToString();
+        }
+
         public DestList(byte[] rawBytes)
         {
             Entries = new List<DestListEntry>();
@@ -15,7 +33,7 @@ namespace OleCf
             Header = new DestListHeader(headerBytes);
 
             var index = 32;
-            var pathSize = 0;
+            int pathSize = 0;
             var entrySize = 0;
 
             if (Header.Version == 1)
@@ -49,7 +67,7 @@ namespace OleCf
                     pathSize = BitConverter.ToInt16(rawBytes, index + 128);
                     //now that we know pathSize we can determine how big each record is
                     entrySize = 128 + 2 + pathSize*2 + 4;
-                        //128 is offset to the string, 2 for the size itself, double path for unicode, then 4 extra at the end
+                    //128 is offset to the string, 2 for the size itself, double path for unicode, then 4 extra at the end
 
                     var entryBytes2 = new byte[entrySize];
                     Buffer.BlockCopy(rawBytes, index, entryBytes2, 0, entrySize);

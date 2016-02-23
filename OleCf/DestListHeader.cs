@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Text;
 
 namespace OleCf
 {
@@ -14,6 +15,22 @@ namespace OleCf
             Unknown1 = BitConverter.ToInt32(rawBytes, 20);
             LastRevisionNumber = BitConverter.ToInt32(rawBytes, 24);
             Unknown2 = BitConverter.ToInt32(rawBytes, 28);
+        }
+
+        public override string ToString()
+        {
+            var sb = new StringBuilder();
+
+            sb.AppendLine($"Version: {Version}");
+            sb.AppendLine($"NumberOfEntries: {NumberOfEntries}");
+            sb.AppendLine($"NumberOfPinnedEntries: {NumberOfPinnedEntries}");
+            sb.AppendLine($"LastEntryNumber: {LastEntryNumber}");
+            sb.AppendLine($"LastRevisionNumber: {LastRevisionNumber}");
+            sb.AppendLine($"Unknown0: {Unknown0}");
+            sb.AppendLine($"Unknown1: {Unknown1}");
+            sb.AppendLine($"Unknown2: {Unknown2}");
+
+            return sb.ToString();
         }
 
         public int Version { get; }

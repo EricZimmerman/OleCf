@@ -49,19 +49,14 @@ namespace OleCf
             {
                 var ssatbytes = GetDataFromSat(Header.SSATFirstSectorId);
 
-            SSat = new int[ssatbytes.Length/4];
+                SSat = new int[ssatbytes.Length/4];
 
-            for (var i = 0; i < ssatbytes.Length/4; i++)
-            {
-                var ssatAddr = BitConverter.ToInt32(ssatbytes, i*4);
-                SSat[i] = ssatAddr;
+                for (var i = 0; i < ssatbytes.Length/4; i++)
+                {
+                    var ssatAddr = BitConverter.ToInt32(ssatbytes, i*4);
+                    SSat[i] = ssatAddr;
+                }
             }
-            }
-            else
-            {
-                
-            }
-            
 
             //build our directory items
             //first, get all the bytes we need
@@ -95,7 +90,7 @@ namespace OleCf
             _shortSectors = new List<byte[]>();
 
             var rootDir = DirectoryItems.SingleOrDefault(t => t.DirectoryName.ToLowerInvariant() == "root entry");
-            if (rootDir != null && rootDir.DirectorySize>0)
+            if (rootDir != null && rootDir.DirectorySize > 0)
             {
                 var b = GetDataFromSat((int) rootDir.FirstDirectorySectorId);
 
@@ -114,7 +109,7 @@ namespace OleCf
             }
 
             var destList = DirectoryItems.SingleOrDefault(t => t.DirectoryName.ToLowerInvariant() == "destlist");
-            if (destList != null && destList.DirectorySize>0)
+            if (destList != null && destList.DirectorySize > 0)
             {
                 var destBytes = GetPayloadForDirectory(destList);
 
