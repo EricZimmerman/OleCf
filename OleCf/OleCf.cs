@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Runtime.Remoting.Messaging;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.IO;
 
 namespace OleCf
 {
@@ -14,7 +8,7 @@ namespace OleCf
         {
             var contents = File.ReadAllBytes(filename);
 
-            var o = new OleCfFile(contents);
+            var o = new OleCfFile(contents, filename);
 
             return o;
         }

@@ -48,7 +48,7 @@ namespace OleCf.Test
         [Test]
         public void InvalidFileShouldThrowException()
         {
-            var badFile = Path.Combine(@"C:\Temp\Logons1000.csv");
+            var badFile = Path.Combine(@"D:\Temp\DirProcessing.txt");
             Action action = () => OleCf.LoadFile(badFile);
 
             action.ShouldThrow<Exception>().WithMessage("Invalid signature!");

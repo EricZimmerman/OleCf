@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Text;
 
 namespace OleCf
@@ -34,17 +33,17 @@ namespace OleCf
                 throw new Exception("Handle this case specifically");
             }
 
-            SectorSize =  BitConverter.ToInt16(rawBytes, 30);
+            SectorSize = BitConverter.ToInt16(rawBytes, 30);
             ShortSectorSize = BitConverter.ToInt16(rawBytes, 32);
 
-            SectorSizeAsBytes = (int) Math.Pow(2, SectorSize);
-            ShortSectorSizeAsBytes = (int) Math.Pow(2, ShortSectorSize);
 
             TotalSATSectors = BitConverter.ToInt32(rawBytes, 44);
             DirectoryStreamFirstSectorId = BitConverter.ToInt32(rawBytes, 48);
             MinimumStandardStreamSize = BitConverter.ToUInt32(rawBytes, 56);
+
             SSATFirstSectorId = BitConverter.ToInt32(rawBytes, 60);
-            SSATTotalSectors = BitConverter.ToUInt32(rawBytes, 64);
+            TotalSSATSectors = BitConverter.ToUInt32(rawBytes, 64);
+
             MSATFirstSectorId = BitConverter.ToInt32(rawBytes, 68); //-2 denotes there are no additional msat sectors
             MSATTotalSectors = BitConverter.ToInt32(rawBytes, 72);
 
@@ -59,19 +58,13 @@ namespace OleCf
 
                 var satAddr = BitConverter.ToInt32(sectorId, 0);
 
-                //Debug.WriteLine($"satAddr: {satAddr}");
-
                 if (satAddr >= 0)
                 {
-                    SATSectors[i] = (BitConverter.ToInt32(sectorId, 0) * SectorSizeAsBytes) + 512; // 512 is for the header
+                    SATSectors[i] = BitConverter.ToInt32(sectorId, 0)*SectorSizeAsBytes + 512; // 512 is for the header
                 }
                 
-
                 SectorIds.Add(sectorId);
             }
-
-        
-
         }
 
         public Guid ClassId { get; }
@@ -82,10 +75,12 @@ namespace OleCf
 
         public short SectorSize { get; }
 
-        public int SectorSizeAsBytes { get; }
+        public int SectorSizeAsBytes => (int) Math.Pow(2, SectorSize);
 
         public short ShortSectorSize { get; }
-        public int ShortSectorSizeAsBytes { get; }
+
+        public int ShortSectorSizeAsBytes => (int)Math.Pow(2, ShortSectorSize);
+
 
         public int TotalSATSectors { get; }
         public int DirectoryStreamFirstSectorId { get; }
@@ -93,14 +88,14 @@ namespace OleCf
         public uint MinimumStandardStreamSize { get; }
 
         public int SSATFirstSectorId { get; }
-        public uint SSATTotalSectors { get; }
+        public uint TotalSSATSectors { get; }
 
         public int MSATFirstSectorId { get; }
 
         public int MSATTotalSectors { get; }
 
         /// <summary>
-        /// Contains absolute sector addresses for where SAT sectors are located
+        ///     Contains absolute sector addresses for where SAT sectors are located
         /// </summary>
         public int[] SATSectors { get; }
 
@@ -112,7 +107,7 @@ namespace OleCf
             sb.AppendLine($"Revision: {RevisionMajor}.{RevisionMinor}");
             sb.AppendLine($"Is Little Endian: {IsLittleEndian}");
             sb.AppendLine();
-            sb.AppendLine($"Sector Size: {SectorSize} ({Math.Pow(2,SectorSize)} bytes)");
+            sb.AppendLine($"Sector Size: {SectorSize} ({Math.Pow(2, SectorSize)} bytes)");
             sb.AppendLine($"Short Sector Size: {ShortSectorSize} ({Math.Pow(2, ShortSectorSize)} bytes)");
             sb.AppendLine();
 
@@ -123,7 +118,7 @@ namespace OleCf
 
             sb.AppendLine();
             sb.AppendLine($"SSAT First SectorId {SSATFirstSectorId}");
-            sb.AppendLine($"SSAT Total Sectors {SSATTotalSectors}");
+            sb.AppendLine($"SSAT Total Sectors {TotalSSATSectors}");
 
             sb.AppendLine();
             sb.AppendLine($"MSAT First SectorId {MSATFirstSectorId}");
@@ -137,9 +132,10 @@ namespace OleCf
                 var val = BitConverter.ToInt32(sectorId, 0);
                 if (val > -1)
                 {
-                    sb.AppendLine($"Sector #{i}: {BitConverter.ToString(sectorId)} ({val}) Offset: {512 + (val * Math.Pow(2, SectorSize))}");
+                    sb.AppendLine(
+                        $"Sector #{i}: {BitConverter.ToString(sectorId)} ({val}) Offset: {512 + val*Math.Pow(2, SectorSize)}");
                 }
-                
+
                 i += 1;
             }
 
