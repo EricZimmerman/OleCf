@@ -3,7 +3,7 @@ using System.Text;
 
 namespace OleCf
 {
-    public class DirectoryItem
+    public class DirectoryEntry
     {
         public enum DirectoryEntryTypes
         {
@@ -21,7 +21,7 @@ namespace OleCf
             Black = 1
         }
 
-        public DirectoryItem(byte[] rawBytes)
+        public DirectoryEntry(byte[] rawBytes)
         {
             var dirLen = (int) BitConverter.ToInt16(rawBytes, 64); // includes null terminator
             dirLen = dirLen - 2;

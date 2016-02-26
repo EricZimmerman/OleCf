@@ -8,7 +8,6 @@ namespace OleCf
     {
         private readonly byte[] _rawBytes;
         private readonly List<byte[]> _shortSectors;
-        public DestList DestList;
 
         public OleCfFile(byte[] rawBytes, string sourceFile)
         {
@@ -64,7 +63,7 @@ namespace OleCf
 
             var dirIndex = 0;
 
-            DirectoryItems = new List<DirectoryItem>();
+            Directory = new List<DirectoryEntry>();
 
             //process all directories
             while (dirIndex < dirBytes.Length)
@@ -75,9 +74,9 @@ namespace OleCf
 
                 if (dBytes[66] != 0) //0 is empty directory structure
                 {
-                    var d = new DirectoryItem(dBytes);
+                    var d = new DirectoryEntry(dBytes);
 
-                    DirectoryItems.Add(d);
+                    Directory.Add(d);
                 }
 
                 dirIndex += 128;
@@ -89,7 +88,7 @@ namespace OleCf
             //when we are done we will have a list of byte arrays, each 64 bytes long, that we can string together later based on SSAT
             _shortSectors = new List<byte[]>();
 
-            var rootDir = DirectoryItems.SingleOrDefault(t => t.DirectoryName.ToLowerInvariant() == "root entry");
+            var rootDir = Directory.SingleOrDefault(t => t.DirectoryName.ToLowerInvariant() == "root entry");
             if (rootDir != null && rootDir.DirectorySize > 0)
             {
                 var b = GetDataFromSat((int) rootDir.FirstDirectorySectorId);
@@ -107,25 +106,17 @@ namespace OleCf
                     shortIndex += 64;
                 }
             }
-
-            var destList = DirectoryItems.SingleOrDefault(t => t.DirectoryName.ToLowerInvariant() == "destlist");
-            if (destList != null && destList.DirectorySize > 0)
-            {
-                var destBytes = GetPayloadForDirectory(destList);
-
-                DestList = new DestList(destBytes);
-            }
         }
 
         public Header Header { get; }
 
-        public List<DirectoryItem> DirectoryItems { get; }
+        public List<DirectoryEntry> Directory { get; }
         public int[] Sat { get; }
         public int[] SSat { get; }
 
         public string SourceFile { get; }
 
-        public byte[] GetPayloadForDirectory(DirectoryItem dir)
+        public byte[] GetPayloadForDirectory(DirectoryEntry dir)
         {
             byte[] payLoadBytes = null;
 
