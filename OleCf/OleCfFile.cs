@@ -167,8 +167,12 @@ namespace OleCf
                 {
                     readSize = _rawBytes.Length - index;
                 }
+                if (readSize > 0)
+                {
+                    Buffer.BlockCopy(_rawBytes, index, retBytes, sectorSize * offset, readSize);
+                }
 
-                Buffer.BlockCopy(_rawBytes, index, retBytes, sectorSize*offset, readSize);
+                
                 offset += 1;
             }
 

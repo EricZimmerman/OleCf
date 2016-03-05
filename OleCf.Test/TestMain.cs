@@ -70,6 +70,13 @@ namespace OleCf.Test
         }
 
         [Test]
+        public void OneOff()
+        {
+            var o =
+                OleCf.LoadFile(@"C:\Users\e\Desktop\Tom\AutomaticDestinations\9b9cdc69c1c24e2b.automaticDestinations-ms");
+        }
+
+        [Test]
         public void InvalidFileShouldThrowException()
         {
             var badFile = Path.Combine(BadPath, @"CALC.EXE-3FBEF7FD.pf");
