@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 
 namespace OleCf
@@ -18,6 +19,32 @@ namespace OleCf
             Buffer.BlockCopy(rawBytes, 0, headerBytes, 0, 512);
 
             Header = new Header(headerBytes);
+
+            //big file!!
+            if (Header.MSATFirstSectorId > -2)
+            {
+                var msatOff = (Header.MSATFirstSectorId + 1) * Header.SectorSizeAsBytes;
+                var remainingSlots = Header.TotalSATSectors - 109;
+                var remainingByteLen = 4 * remainingSlots;
+                var remainingBytes = new byte[remainingByteLen];
+
+                Buffer.BlockCopy(rawBytes,msatOff,remainingBytes,0,remainingByteLen);
+
+                for (var i = 0; i < remainingSlots; i++)
+                {
+                    var sectorId = new byte[4];
+                    Buffer.BlockCopy(rawBytes, msatOff+ i * 4, sectorId, 0, 4);
+
+                    var satAddr = BitConverter.ToInt32(sectorId, 0);
+
+                    if (satAddr >= 0)
+                    {
+                        Header.SATSectors[109 + i] = BitConverter.ToInt32(sectorId, 0) * Header.SectorSizeAsBytes + 512; // 512 is for the header
+                    }
+
+                    Header.SectorIds.Add(sectorId);
+                }
+            }
 
             //We need to get all the bytes that make up the SectorAllocationTable
             //start with empty array to hold our bytes
@@ -68,11 +95,18 @@ namespace OleCf
             //process all directories
             while (dirIndex < dirBytes.Length)
             {
+                if (dirIndex == 229760)
+                {
+                    Debug.WriteLine(1);
+
+                }
                 var dBytes = new byte[128];
 
                 Buffer.BlockCopy(dirBytes, dirIndex, dBytes, 0, 128);
 
-                if (dBytes[66] != 0) //0 is empty directory structure
+                var dirLen = (int) BitConverter.ToInt16(dBytes, 64);
+
+                if (dBytes[66] != 0 && dirLen > 0) //0 is empty directory structure
                 {
                     var d = new DirectoryEntry(dBytes);
 
@@ -120,11 +154,12 @@ namespace OleCf
         {
             byte[] payLoadBytes = null;
 
-            if (dir.DirectorySize > Header.MinimumStandardStreamSize)
+            if (dir.DirectorySize >= Header.MinimumStandardStreamSize)
             {
                 var b = GetDataFromSat((int) dir.FirstDirectorySectorId);
 
                 payLoadBytes = new byte[dir.DirectorySize];
+
                 Buffer.BlockCopy(b, 0, payLoadBytes, 0, dir.DirectorySize);
             }
             else

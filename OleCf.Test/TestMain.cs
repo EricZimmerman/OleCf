@@ -73,7 +73,13 @@ namespace OleCf.Test
         public void OneOff()
         {
             var o =
-                OleCf.LoadFile(@"C:\Users\e\Desktop\Tom\AutomaticDestinations\9b9cdc69c1c24e2b.automaticDestinations-ms");
+                OleCf.LoadFile(@"C:\Users\e\Desktop\testjl\5d696d521de238c3.automaticDestinations-ms");
+
+
+            var destList = o.Directory.SingleOrDefault(t => t.DirectoryName.ToLowerInvariant() == "destlist");
+            var foo = o.GetPayloadForDirectory(destList);
+
+            Debug.WriteLine(o.Directory.Count);
         }
 
         [Test]

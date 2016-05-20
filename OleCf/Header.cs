@@ -64,6 +64,11 @@ namespace OleCf
 
                 SectorIds.Add(sectorId);
             }
+
+ 
+
+
+
         }
 
         public Guid ClassId { get; }
