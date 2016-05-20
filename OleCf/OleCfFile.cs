@@ -23,17 +23,48 @@ namespace OleCf
             //big file!!
             if (Header.MSATFirstSectorId > -2)
             {
-                var msatOff = (Header.MSATFirstSectorId + 1) * Header.SectorSizeAsBytes;
+                var maxSlotsPerBlock = Header.SectorSizeAsBytes/4;
+
                 var remainingSlots = Header.TotalSATSectors - 109;
                 var remainingByteLen = 4 * remainingSlots;
                 var remainingBytes = new byte[remainingByteLen];
 
-                Buffer.BlockCopy(rawBytes,msatOff,remainingBytes,0,remainingByteLen);
+                var msatOff = (Header.MSATFirstSectorId + 1) * Header.SectorSizeAsBytes;
+
+                var startOffset = 0;
+
+                while (remainingSlots>0)
+                {
+                    if (remainingSlots > maxSlotsPerBlock)
+                    {
+                        // in this case we have to only take so many bytes
+
+                        Buffer.BlockCopy(rawBytes, msatOff, remainingBytes, 0, Header.SectorSizeAsBytes -4); // the last slot points to our next place to look
+                        remainingSlots -= maxSlotsPerBlock - 1;
+
+                        var newoffset = BitConverter.ToInt32(rawBytes, msatOff + (4*(maxSlotsPerBlock-1)));
+
+                        msatOff = (newoffset + 1) * Header.SectorSizeAsBytes;
+
+                        startOffset += (maxSlotsPerBlock - 1) * 4;
+                    }
+                    else
+                    {
+                        //copy it and be done with it
+                        Buffer.BlockCopy(rawBytes, msatOff, remainingBytes, startOffset, remainingSlots *4);
+                        remainingSlots -= remainingSlots;
+                    }
+                }
+
+
+                remainingSlots = Header.TotalSATSectors - 109;
+
+
 
                 for (var i = 0; i < remainingSlots; i++)
                 {
                     var sectorId = new byte[4];
-                    Buffer.BlockCopy(rawBytes, msatOff+ i * 4, sectorId, 0, 4);
+                    Buffer.BlockCopy(remainingBytes,  i * 4, sectorId, 0, 4);
 
                     var satAddr = BitConverter.ToInt32(sectorId, 0);
 
@@ -44,6 +75,11 @@ namespace OleCf
 
                     Header.SectorIds.Add(sectorId);
                 }
+
+
+
+
+
             }
 
             //We need to get all the bytes that make up the SectorAllocationTable
