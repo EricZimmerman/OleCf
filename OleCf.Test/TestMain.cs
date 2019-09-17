@@ -72,8 +72,8 @@ namespace OleCf.Test
         [Test]
         public void OneOff()
         {
-            var o =
-                OleCf.LoadFile(@"C:\Users\e\Desktop\testjl\5d696d521de238c3.automaticDestinations-ms");
+            var o =OleCf.LoadFile(@"C:\Temp\f01b4d95cf55d32a.automaticDestinations-ms");
+         //   var o =OleCf.LoadFile(@"C:\Temp\5f7b5f1e01b83767.automaticDestinations-ms");
 
 
             var destList = o.Directory.SingleOrDefault(t => t.DirectoryName.ToLowerInvariant() == "destlist");
@@ -88,7 +88,7 @@ namespace OleCf.Test
             var badFile = Path.Combine(BadPath, @"CALC.EXE-3FBEF7FD.pf");
             Action action = () => OleCf.LoadFile(badFile);
 
-            action.ShouldThrow<Exception>().WithMessage("Invalid signature!");
+            action.Should().Throw<Exception>().WithMessage("Invalid signature!");
         }
     }
 }

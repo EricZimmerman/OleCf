@@ -4,16 +4,13 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{7088E754-DB90-4BCE-9F0C-94779337E7F2}</ProjectGuid>
+    <ProjectGuid>{C2B1CBC2-7109-44C6-A4A6-D6A71B6E8579}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>OleCf.Test</RootNamespace>
-    <AssemblyName>OleCf.Test</AssemblyName>
-    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
+    <RootNamespace>OleCf</RootNamespace>
+    <AssemblyName>OleCf</AssemblyName>
+    <TargetFrameworkVersion>v4.6</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
-    <NuGetPackageImportStamp>
-    </NuGetPackageImportStamp>
-    <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -34,7 +31,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
-    <Reference Include="System.Configuration" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
@@ -44,35 +40,11 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="TestMain.cs" />
+    <Compile Include="DirectoryEntry.cs" />
+    <Compile Include="Header.cs" />
+    <Compile Include="OleCf.cs" />
+    <Compile Include="OleCfFile.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="app.config" />
-    <None Include="TestFiles\Bad\CALC.EXE-3FBEF7FD.pf" />
-    <None Include="TestFiles\Win10\5f7b5f1e01b83767.automaticDestinations-ms" />
-    <None Include="TestFiles\Win10\7e4dca80246863e3.automaticDestinations-ms" />
-    <None Include="TestFiles\Win10\f01b4d95cf55d32a.automaticDestinations-ms" />
-    <None Include="TestFiles\Win7\1b4dd67f29cb1962.automaticDestinations-ms" />
-    <None Include="TestFiles\Win80\f01b4d95cf55d32a.automaticDestinations-ms" />
-    <None Include="TestFiles\Win81\f01b4d95cf55d32a.automaticDestinations-ms" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="FluentAssertions">
-      <Version>5.9.0</Version>
-    </PackageReference>
-    <PackageReference Include="NUnit">
-      <Version>3.12.0</Version>
-    </PackageReference>
-    <PackageReference Include="System.ValueTuple">
-      <Version>4.5.0</Version>
-    </PackageReference>
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\OleCf\OleCf.csproj">
-      <Project>{c2b1cbc2-7109-44c6-a4a6-d6a71b6e8579}</Project>
-      <Name>OleCf</Name>
-    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
