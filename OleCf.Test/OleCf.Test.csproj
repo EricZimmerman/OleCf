@@ -3,6 +3,11 @@
     <TargetFrameworks>net461;netstandard2.0;net5.0</TargetFrameworks>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Remove="Properties\**" />
+    <EmbeddedResource Remove="Properties\**" />
+    <None Remove="Properties\**" />
+  </ItemGroup>
+  <ItemGroup>
     <None Include="app.config" />
     <None Include="TestFiles\Bad\CALC.EXE-3FBEF7FD.pf" />
     <None Include="TestFiles\Win10\5f7b5f1e01b83767.automaticDestinations-ms" />
@@ -14,10 +19,10 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="FluentAssertions">
-      <Version>5.9.0</Version>
+      <Version>5.10.3</Version>
     </PackageReference>
     <PackageReference Include="NUnit">
-      <Version>3.12.0</Version>
+      <Version>3.13.2</Version>
     </PackageReference>
     <PackageReference Include="System.ValueTuple">
       <Version>4.5.0</Version>
@@ -25,8 +30,5 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\OleCf\OleCf.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <Folder Include="Properties\" />
   </ItemGroup>
 </Project>
