@@ -1,17 +1,16 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>netstandard2.0;net5.0;net6.0</TargetFrameworks>
+    <TargetFrameworks>netstandard2.0;net6.0</TargetFrameworks>
+    <LangVersion>10</LangVersion>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <Authors>Eric Zimmerman</Authors>
     <Company>Eric Zimmerman</Company>
     <Product>OLECF parser</Product>
     <Description>Parses OLECF containers</Description>
-    <Copyright>Eric Zimmerman</Copyright>
+    <Copyright>Eric Zimmerman 2022</Copyright>
     <PackageProjectUrl>https://github.com/EricZimmerman/olecf</PackageProjectUrl>
     <RepositoryUrl>https://github.com/EricZimmerman/olecf</RepositoryUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <AssemblyVersion>1.1.0.3</AssemblyVersion>
-    <FileVersion>1.1.0.3</FileVersion>
-    <Version>1.1.0.3</Version>
+    <Version>1.1.1.0</Version>
   </PropertyGroup>
 </Project>

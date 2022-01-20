@@ -1,6 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>net461;netstandard2.0;net5.0;net6.0</TargetFrameworks>
+    <TargetFrameworks>netstandard2.0;net6.0</TargetFrameworks>
+    <LangVersion>10</LangVersion>
   </PropertyGroup>
   <ItemGroup>
     <Compile Remove="Properties\**" />
@@ -8,7 +9,6 @@
     <None Remove="Properties\**" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="app.config" />
     <None Include="TestFiles\Bad\CALC.EXE-3FBEF7FD.pf" />
     <None Include="TestFiles\Win10\5f7b5f1e01b83767.automaticDestinations-ms" />
     <None Include="TestFiles\Win10\7e4dca80246863e3.automaticDestinations-ms" />
@@ -18,7 +18,7 @@
     <None Include="TestFiles\Win81\f01b4d95cf55d32a.automaticDestinations-ms" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="FluentAssertions" Version="6.2.0" />
+    <PackageReference Include="FluentAssertions" Version="6.3.0" />
     <PackageReference Include="NUnit" Version="3.13.2" />
     <PackageReference Include="System.ValueTuple" Version="4.5.0" />
   </ItemGroup>

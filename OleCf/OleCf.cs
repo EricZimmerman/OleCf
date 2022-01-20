@@ -1,16 +1,15 @@
 ﻿using System.IO;
 
-namespace OleCf
+namespace OleCf;
+
+public static class OleCf
 {
-    public static class OleCf
+    public static OleCfFile LoadFile(string filename)
     {
-        public static OleCfFile LoadFile(string filename)
-        {
-            var contents = File.ReadAllBytes(filename);
+        var contents = File.ReadAllBytes(filename);
 
-            var o = new OleCfFile(contents, filename);
+        var o = new OleCfFile(contents, filename);
 
-            return o;
-        }
+        return o;
     }
 }
