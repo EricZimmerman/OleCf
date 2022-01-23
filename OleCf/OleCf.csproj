@@ -7,7 +7,7 @@
     <Company>Eric Zimmerman</Company>
     <Product>OLECF parser</Product>
     <Description>Parses OLECF containers</Description>
-    <Copyright>Eric Zimmerman 2022</Copyright>
+    <Copyright>Eric Zimmerman</Copyright>
     <PackageProjectUrl>https://github.com/EricZimmerman/olecf</PackageProjectUrl>
     <RepositoryUrl>https://github.com/EricZimmerman/olecf</RepositoryUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
