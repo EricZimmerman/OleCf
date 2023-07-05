@@ -18,8 +18,8 @@
     <None Include="TestFiles\Win81\f01b4d95cf55d32a.automaticDestinations-ms" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="FluentAssertions" Version="6.3.0" />
-    <PackageReference Include="NUnit" Version="3.13.2" />
+    <PackageReference Include="FluentAssertions" Version="6.11.0" />
+    <PackageReference Include="NUnit" Version="3.13.3" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\OleCf\OleCf.csproj" />
