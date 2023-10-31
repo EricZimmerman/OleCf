@@ -53,22 +53,38 @@ public class Header
         for (var i = 0; i < 109; i++)
         {
             var sectorId = new byte[4];
+            // verify source buffer has enough room to read the sector ID bytes from it 
+            if ((76 + i * 4) + 4 > rawBytes.Length)
+            {
+                throw new Exception($"The source buffer does not contain enough data to read the sector ID - is this file corrupt?");
+            }
+
             Buffer.BlockCopy(rawBytes, 76 + i*4, sectorId, 0, 4);
 
             var satAddr = BitConverter.ToInt32(sectorId, 0);
 
             if (satAddr >= 0)
             {
-                SATSectors[i] = BitConverter.ToInt32(sectorId, 0)*SectorSizeAsBytes + 512; // 512 is for the header
+                int iSectorId = BitConverter.ToInt32(sectorId, 0);
+                if (iSectorId >= 0)
+                {
+                    if (i < SATSectors.Length)
+                    {
+                        SATSectors[i] = iSectorId * SectorSizeAsBytes + 512; // 512 is for the header
+                    }
+                    else
+                    {
+                        throw new Exception($"The current sector ({i}) was larger than the total number of sectors expected from the header data ({TotalSATSectors}) - is this file corrupt?");
+                    }
+                }
+                else
+                {
+                    throw new Exception($"Invalid sector ID value ({iSectorId}) - is this file corrupt?");
+                }
             }
 
             SectorIds.Add(sectorId);
         }
-
- 
-
-
-
     }
 
     public Guid ClassId { get; }

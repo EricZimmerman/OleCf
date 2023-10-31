@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Reflection;
 
 namespace OleCf;
 
@@ -15,6 +16,11 @@ public class OleCfFile
         SourceFile = sourceFile;
         _rawBytes = rawBytes;
         var headerBytes = new byte[512];
+
+        if (rawBytes.Length < 512)
+        {
+            throw new Exception($"The file length ({rawBytes.Length}) is less than the length of an OLESS header (512 bytes) - this file ({sourceFile}) is either not an OLE structured storage document or is corrupt.");
+        }
 
         Buffer.BlockCopy(rawBytes, 0, headerBytes, 0, 512);
 
@@ -90,8 +96,17 @@ public class OleCfFile
         for (var i = 0; i < Header.SATSectors.Length; i++)
         {
             var satChunk = new byte[Header.SectorSizeAsBytes];
+            if (Header.SATSectors[i] + Header.SectorSizeAsBytes > rawBytes.Length || Header.SectorSizeAsBytes > satChunk.Length)
+            {
+                throw new Exception($"Error copying data from the Sector Allocation Table - is this file corrupt?");
+            }
+
             Buffer.BlockCopy(rawBytes, Header.SATSectors[i], satChunk, 0, Header.SectorSizeAsBytes);
 
+            if (Header.SectorSizeAsBytes > satChunk.Length || i * Header.SectorSizeAsBytes + Header.SectorSizeAsBytes  > satbytes.Length)
+            {
+                throw new Exception($"Error copying data from the Sector Allocation Table - is this file corrupt?");
+            }
             Buffer.BlockCopy(satChunk, 0, satbytes, i*Header.SectorSizeAsBytes, Header.SectorSizeAsBytes);
         }
 
@@ -138,6 +153,11 @@ public class OleCfFile
             }
             var dBytes = new byte[128];
 
+            if (dirIndex + 128 > dirBytes.Length || 128 > dBytes.Length)
+            {
+                throw new Exception($"Error copying data from directory index ({dirIndex}) - is this file corrupt?");
+            }
+
             Buffer.BlockCopy(dirBytes, dirIndex, dBytes, 0, 128);
 
             var dirLen = (int) BitConverter.ToInt16(dBytes, 64);
@@ -169,6 +189,11 @@ public class OleCfFile
             {
                 var shortChunk = new byte[Header.ShortSectorSizeAsBytes];
 
+                if (shortIndex + Header.ShortSectorSizeAsBytes > b.Length || Header.ShortSectorSizeAsBytes > shortChunk.Length)
+                {
+                    throw new Exception($"Error copying data for short sector ({shortIndex}) - is this file corrupt?");
+                }
+
                 Buffer.BlockCopy(b, shortIndex, shortChunk, 0, Header.ShortSectorSizeAsBytes);
 
                 _shortSectors.Add(shortChunk);
@@ -196,13 +221,23 @@ public class OleCfFile
 
             payLoadBytes = new byte[dir.DirectorySize];
 
+            if (dir.DirectorySize > b.Length || dir.DirectorySize > payLoadBytes.Length)
+            {
+                throw new Exception($"Error copying payload data for directory ({dir.DirectoryName}) - is this file corrupt?");
+            }
+
             Buffer.BlockCopy(b, 0, payLoadBytes, 0, dir.DirectorySize);
         }
-        else
+        else if (Header.SSATFirstSectorId != -2) // SSat array is only initialized if (Header.SSATFirstSectorId != -2)
         {
             var b = GetDataFromSSat((int) dir.FirstDirectorySectorId);
 
             payLoadBytes = new byte[dir.DirectorySize];
+
+            if (dir.DirectorySize > b.Length || dir.DirectorySize > payLoadBytes.Length)
+            {
+                throw new Exception($"Error copying payload data for directory ({dir.DirectoryName}) - is this file corrupt?");
+            }
             Buffer.BlockCopy(b, 0, payLoadBytes, 0, dir.DirectorySize);
         }
 
@@ -240,6 +275,11 @@ public class OleCfFile
             }
             if (readSize > 0)
             {
+                if (index + readSize > _rawBytes.Length || (sectorSize * offset) + readSize > retBytes.Length)
+                {
+                    throw new Exception($"Error copying run information for run ({i}) - is this file corrupt?");
+                }
+
                 Buffer.BlockCopy(_rawBytes, index, retBytes, sectorSize * offset, readSize);
             }
 
@@ -272,6 +312,11 @@ public class OleCfFile
         var offset = 0;
         foreach (var i in runInfo)
         {
+            if (sectorSize > _shortSectors[i].Length || (sectorSize * offset) + sectorSize > retBytes.Length)
+            {
+                throw new Exception($"Error copying run information for run ({i}) - is this file corrupt?");
+            }
+
             Buffer.BlockCopy(_shortSectors[i], 0, retBytes, sectorSize*offset, sectorSize);
             offset += 1;
         }
