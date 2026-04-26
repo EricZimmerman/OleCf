@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>netstandard2.0;net6.0</TargetFrameworks>
+    <TargetFramework>netstandard2.0</TargetFramework>
     <LangVersion>10</LangVersion>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
@@ -19,8 +19,8 @@
     <None Include="TestFiles\Win81\f01b4d95cf55d32a.automaticDestinations-ms" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="FluentAssertions" Version="7.0.0" />
-    <PackageReference Include="NUnit" Version="4.3.2" />
+    <PackageReference Include="FluentAssertions" Version="8.9.0" />
+    <PackageReference Include="NUnit" Version="4.5.1" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\OleCf\OleCf.csproj" />
