@@ -1,93 +1,104 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
+using System;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using FluentAssertions;
 using NUnit.Framework;
 
 namespace OleCf.Test;
 
+/// <summary>
+///     Assertions on the real jump lists in TestFiles/. Expected names, sizes and MD5s (first 12 hex digits) come
+///     from Python's olefile.
+/// </summary>
 [TestFixture]
 public class TestMain
 {
-    public static string BasePath = @"..\..\TestFiles";
-    public static string Win10Path = Path.Combine(BasePath, "Win10");
-    public static string Win2K3Path = Path.Combine(BasePath, "Win2k3");
-    public static string Win7Path = Path.Combine(BasePath, "Win7");
-    public static string Win80Path = Path.Combine(BasePath, "Win80");
-    public static string Win81Path = Path.Combine(BasePath, "Win81");
-    public static string Win2012Path = Path.Combine(BasePath, "Win2012");
-    public static string Win2012R2Path = Path.Combine(BasePath, "Win2012R2");
+    internal static string Sample(params string[] parts) =>
+        Path.Combine(new[] { TestContext.CurrentContext.TestDirectory, "TestFiles" }.Concat(parts).ToArray());
 
-    public static string MiscPath = Path.Combine(BasePath, "Misc");
-    public static string BadPath = Path.Combine(BasePath, "Bad");
+    internal static string Md5(byte[] data) => Convert.ToHexString(MD5.HashData(data))[..12].ToLowerInvariant();
 
-    // A bunch of good jump lists that I don't want to share =)
-    public static string LocalPath = @"C:\Users\e\AppData\Roaming\Microsoft\Windows\Recent\AutomaticDestinations";
-
-    private readonly List<string> _allPaths = new List<string>
+    private static readonly object[] Streams =
     {
-        //MiscPath,
-        //WinXpPath,
-        Win10Path,
-        //Win2K3Path,
-        Win7Path,
-        Win80Path,
-        Win81Path,
-        LocalPath
-        //Win2012Path,
-        //Win2012R2Path,
+        new object[] { "Win10", "7e4dca80246863e3", "1", 203, "31704fe0f78e" },
+        new object[] { "Win10", "7e4dca80246863e3", "DestList", 332, "35ab50b26849" },
+        new object[] { "Win10", "f01b4d95cf55d32a", "1", 678, "52b192223bc4" },
+        new object[] { "Win10", "f01b4d95cf55d32a", "DestList", 1812, "46a03cb817b2" },
+        new object[] { "Win10", "f01b4d95cf55d32a", "9", 541, "37b6482ba2e0" },
+        new object[] { "Win7", "1b4dd67f29cb1962", "1", 411, "a7e22e886662" },
+        new object[] { "Win7", "1b4dd67f29cb1962", "DestList", 960, "1105a574d3ec" },
+        new object[] { "Win7", "1b4dd67f29cb1962", "4", 408, "6a1755783e5a" },
+        new object[] { "Win80", "f01b4d95cf55d32a", "DestList", 960, "e55a1fbfffdf" },
+        new object[] { "Win80", "f01b4d95cf55d32a", "4", 436, "2613fa5019cb" },
+        new object[] { "Win81", "f01b4d95cf55d32a", "DestList", 960, "b2c0f32680ab" },
+        new object[] { "Win81", "f01b4d95cf55d32a", "4", 436, "18ed87372181" }
     };
 
-
-    [Test]
-    public void BaseTests()
+    [TestCaseSource(nameof(Streams))]
+    public void StreamPayloadMatchesOlefile(string folder, string appId, string name, int size, string md5)
     {
-        foreach (var allPath in _allPaths)
+        var o = OleCf.LoadFile(Sample(folder, appId + ".automaticDestinations-ms"));
+
+        var payload = o.GetPayloadForDirectory(o.Directory.Single(t => t.DirectoryName == name));
+
+        payload.Should().HaveCount(size);
+        Md5(payload).Should().Be(md5);
+    }
+
+    [TestCase("Win10", "5f7b5f1e01b83767", 2)]
+    [TestCase("Win10", "7e4dca80246863e3", 3)]
+    [TestCase("Win10", "f01b4d95cf55d32a", 11)]
+    [TestCase("Win7", "1b4dd67f29cb1962", 6)]
+    [TestCase("Win80", "f01b4d95cf55d32a", 6)]
+    [TestCase("Win81", "f01b4d95cf55d32a", 6)]
+    public void EverySampleParsesCleanly(string folder, string appId, int entries)
+    {
+        var o = OleCf.LoadFile(Sample(folder, appId + ".automaticDestinations-ms"));
+
+        o.Header.SectorSizeAsBytes.Should().Be(512);
+        o.Header.ShortSectorSizeAsBytes.Should().Be(64);
+        o.Directory.Should().HaveCount(entries);
+        o.Directory[0].DirectoryName.Should().Be("Root Entry");
+        o.Directory[0].DirectoryType.Should().Be(DirectoryEntry.DirectoryEntryTypes.RootStorage);
+        o.Directory.Select(t => t.Id).Should().Equal(Enumerable.Range(0, entries));
+        o.ParseErrors.Should().BeEmpty();
+
+        foreach (var entry in o.Directory.Where(t => t.DirectoryType == DirectoryEntry.DirectoryEntryTypes.Stream))
         {
-            foreach (var fname in Directory.GetFiles(allPath))
+            entry.ParseErrors.Should().BeEmpty();
+            var payload = o.GetPayloadForDirectory(entry);
+
+            // Small streams come from the mini stream, so a file without one (5f7b...) gives null
+            if (o.SSat == null && entry.DirectorySize < o.Header.MinimumStandardStreamSize)
             {
-                Debug.WriteLine(fname);
-                var o = OleCf.LoadFile(fname);
-
-                o.Header.Should().NotBeNull();
-
-                Debug.WriteLine(o.Header);
-
-                Debug.WriteLine($"Directory items. total: {o.Directory.Count}");
-                foreach (var directoryItem in o.Directory)
-                {
-                    directoryItem.DirectoryName.Should().NotBeNullOrEmpty();
-
-                    Debug.WriteLine(
-                        $"Name: {directoryItem.DirectoryName}, Size: {directoryItem.DirectorySize}, Type: {directoryItem.DirectoryType}");
-                }
-
-                Debug.WriteLine("");
+                payload.Should().BeNull();
+            }
+            else
+            {
+                payload.Should().HaveCount(entry.DirectorySize);
             }
         }
     }
 
     [Test]
-    public void OneOff()
+    public void EmptyStreamInFileWithoutSsatIsNull()
     {
-        var o =OleCf.LoadFile(@"C:\Temp\f01b4d95cf55d32a.automaticDestinations-ms");
-        //   var o =OleCf.LoadFile(@"C:\Temp\5f7b5f1e01b83767.automaticDestinations-ms");
+        // The Win10 5f7b... jump list has an empty DestList and no mini stream at all
+        var o = OleCf.LoadFile(Sample("Win10", "5f7b5f1e01b83767.automaticDestinations-ms"));
 
-
-        var destList = o.Directory.SingleOrDefault(t => t.DirectoryName.ToLowerInvariant() == "destlist");
-        var foo = o.GetPayloadForDirectory(destList);
-
-        Debug.WriteLine(o.Directory.Count);
+        o.SSat.Should().BeNull();
+        o.GetPayloadForDirectory(o.Directory.Single(t => t.DirectoryName == "DestList")).Should().BeNull();
     }
 
     [Test]
     public void InvalidFileShouldThrowException()
     {
-        var badFile = Path.Combine(BadPath, @"CALC.EXE-3FBEF7FD.pf");
+        var badFile = Sample("Bad", "CALC.EXE-3FBEF7FD.pf");
         Action action = () => OleCf.LoadFile(badFile);
 
-        action.Should().Throw<Exception>().WithMessage("Invalid signature!");
+        // Still an Exception with the same message for existing callers
+        action.Should().Throw<OleCfParseException>().WithMessage("Invalid signature!")
+            .Where(e => e.Field == "Signature" && e.Offset == 0);
     }
 }

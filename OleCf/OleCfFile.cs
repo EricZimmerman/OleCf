@@ -1,326 +1,361 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
-using System.Reflection;
 
 namespace OleCf;
 
+/// <summary>
+///     An OLE compound file ([MS-CFB]), such as a jump list (*.automaticDestinations-ms).
+/// </summary>
 public class OleCfFile
 {
+    private const int DirectoryEntrySize = 128;
+
     private readonly byte[] _rawBytes;
     private readonly List<byte[]> _shortSectors;
 
+    /// <summary>
+    ///     Parses a compound file.
+    /// </summary>
+    /// <exception cref="OleCfParseException">
+    ///     The header, the allocation tables or the directory can't be read (not a compound file, or corrupt)
+    /// </exception>
     public OleCfFile(byte[] rawBytes, string sourceFile)
     {
+        if (rawBytes == null)
+        {
+            throw new ArgumentNullException(nameof(rawBytes));
+        }
+
         SourceFile = sourceFile;
         _rawBytes = rawBytes;
-        var headerBytes = new byte[512];
 
         if (rawBytes.Length < 512)
         {
-            throw new Exception($"The file length ({rawBytes.Length}) is less than the length of an OLESS header (512 bytes) - this file ({sourceFile}) is either not an OLE structured storage document or is corrupt.");
+            throw new OleCfParseException(
+                $"The file length ({rawBytes.Length}) is less than the length of an OLESS header (512 bytes) - this file ({sourceFile}) is either not an OLE structured storage document or is corrupt.",
+                0, "Header");
         }
 
+        var headerBytes = new byte[512];
         Buffer.BlockCopy(rawBytes, 0, headerBytes, 0, 512);
 
-        Header = new Header(headerBytes);
+        Header = new Header(headerBytes, rawBytes.Length);
 
-        //big file!!
-        if (Header.MSATFirstSectorId > -2)
+        if (Header.TotalSATSectors > Header.HeaderMsatEntries)
         {
-            var maxSlotsPerBlock = Header.SectorSizeAsBytes/4;
-
-            var remainingSlots = Header.TotalSATSectors - 109;
-            var remainingByteLen = 4 * remainingSlots;
-            var remainingBytes = new byte[remainingByteLen];
-
-            var msatOff = (Header.MSATFirstSectorId + 1) * Header.SectorSizeAsBytes;
-
-            var startOffset = 0;
-
-            while (remainingSlots>0)
-            {
-                if (remainingSlots > maxSlotsPerBlock)
-                {
-                    // in this case we have to only take so many bytes
-
-                    Buffer.BlockCopy(rawBytes, msatOff, remainingBytes, 0, Header.SectorSizeAsBytes -4); // the last slot points to our next place to look
-                    remainingSlots -= maxSlotsPerBlock - 1;
-
-                    var newoffset = BitConverter.ToInt32(rawBytes, msatOff + (4*(maxSlotsPerBlock-1)));
-
-                    msatOff = (newoffset + 1) * Header.SectorSizeAsBytes;
-
-                    startOffset += (maxSlotsPerBlock - 1) * 4;
-                }
-                else
-                {
-                    //copy it and be done with it
-                    Buffer.BlockCopy(rawBytes, msatOff, remainingBytes, startOffset, remainingSlots *4);
-                    remainingSlots -= remainingSlots;
-                }
-            }
-
-
-            remainingSlots = Header.TotalSATSectors - 109;
-
-
-
-            for (var i = 0; i < remainingSlots; i++)
-            {
-                var sectorId = new byte[4];
-                Buffer.BlockCopy(remainingBytes,  i * 4, sectorId, 0, 4);
-
-                var satAddr = BitConverter.ToInt32(sectorId, 0);
-
-                if (satAddr >= 0)
-                {
-                    Header.SATSectors[109 + i] = BitConverter.ToInt32(sectorId, 0) * Header.SectorSizeAsBytes + 512; // 512 is for the header
-                }
-
-                Header.SectorIds.Add(sectorId);
-            }
-
-
-
-
-
+            ReadMsatSectors();
         }
 
-        //We need to get all the bytes that make up the SectorAllocationTable
-        //start with empty array to hold our bytes
-        var satbytes = new byte[Header.TotalSATSectors*Header.SectorSizeAsBytes];
-
-        //fill the bytes
-        for (var i = 0; i < Header.SATSectors.Length; i++)
-        {
-            var satChunk = new byte[Header.SectorSizeAsBytes];
-            if (Header.SATSectors[i] + Header.SectorSizeAsBytes > rawBytes.Length || Header.SectorSizeAsBytes > satChunk.Length)
-            {
-                throw new Exception($"Error copying data from the Sector Allocation Table - is this file corrupt?");
-            }
-
-            Buffer.BlockCopy(rawBytes, Header.SATSectors[i], satChunk, 0, Header.SectorSizeAsBytes);
-
-            if (Header.SectorSizeAsBytes > satChunk.Length || i * Header.SectorSizeAsBytes + Header.SectorSizeAsBytes  > satbytes.Length)
-            {
-                throw new Exception($"Error copying data from the Sector Allocation Table - is this file corrupt?");
-            }
-            Buffer.BlockCopy(satChunk, 0, satbytes, i*Header.SectorSizeAsBytes, Header.SectorSizeAsBytes);
-        }
-
-        //satbytes now contains a bunch of bytes we need to convert to signed ints which will act as our map to different sectors
-        //ints are 4 bytes each
-        Sat = new int[satbytes.Length/4];
-
-        //fill the Sat
-        for (var i = 0; i < satbytes.Length/4; i++)
-        {
-            var satAddr = BitConverter.ToInt32(satbytes, i*4);
-            Sat[i] = satAddr;
-        }
+        Sat = ReadSat();
 
         //Just as with the SAT, but this time, with the SmallSectorAllocationTable
-        if (Header.SSATFirstSectorId != -2)
+        // ENDOFCHAIN (-2) means there is no SSAT; treat any other negative id the same way
+        if (Header.SSATFirstSectorId >= 0)
         {
-            var ssatbytes = GetDataFromSat(Header.SSATFirstSectorId);
+            var ssatbytes = GetDataFromSat(Header.SSATFirstSectorId, "SSAT");
 
-            SSat = new int[ssatbytes.Length/4];
+            SSat = new int[ssatbytes.Length / 4];
 
-            for (var i = 0; i < ssatbytes.Length/4; i++)
+            for (var i = 0; i < SSat.Length; i++)
             {
-                var ssatAddr = BitConverter.ToInt32(ssatbytes, i*4);
-                SSat[i] = ssatAddr;
+                SSat[i] = BitConverter.ToInt32(ssatbytes, i * 4);
             }
         }
 
-        //build our directory items
-        //first, get all the bytes we need
-        var dirBytes = GetDataFromSat(Header.DirectoryStreamFirstSectorId);
-
-        var dirIndex = 0;
-
-        Directory = new List<DirectoryEntry>();
-
-        //process all directories
-        while (dirIndex < dirBytes.Length)
-        {
-            if (dirIndex == 229760)
-            {
-                Debug.WriteLine(1);
-
-            }
-            var dBytes = new byte[128];
-
-            if (dirIndex + 128 > dirBytes.Length || 128 > dBytes.Length)
-            {
-                throw new Exception($"Error copying data from directory index ({dirIndex}) - is this file corrupt?");
-            }
-
-            Buffer.BlockCopy(dirBytes, dirIndex, dBytes, 0, 128);
-
-            var dirLen = (int) BitConverter.ToInt16(dBytes, 64);
-
-            if (dBytes[66] != 0 && dirLen > 0) //0 is empty directory structure
-            {
-                var d = new DirectoryEntry(dBytes);
-
-                Directory.Add(d);
-            }
-
-            dirIndex += 128;
-        }
-
+        Directory = ReadDirectory();
 
         //the Root Entry directory item contains all the sectors we need for small sector stuff, so get the data and cut it up so we can use it later
-
         //when we are done we will have a list of byte arrays, each 64 bytes long, that we can string together later based on SSAT
         _shortSectors = new List<byte[]>();
 
-        var rootDir = Directory.SingleOrDefault(t => t.DirectoryName.ToLowerInvariant() == "root entry");
+        var rootDir = Directory.FirstOrDefault(t => t.DirectoryType == DirectoryEntry.DirectoryEntryTypes.RootStorage) ??
+                      Directory.FirstOrDefault(t => t.DirectoryName.ToLowerInvariant() == "root entry");
+
         if (rootDir != null && rootDir.DirectorySize > 0)
         {
-            var b = GetDataFromSat((int) rootDir.FirstDirectorySectorId);
+            var b = GetDataFromSat((int)rootDir.FirstDirectorySectorId, "Mini stream");
+            var shortSize = Header.ShortSectorSizeAsBytes;
 
-            var shortIndex = 0;
-
-            while (shortIndex < b.Length)
+            for (var shortIndex = 0; shortIndex + shortSize <= b.Length; shortIndex += shortSize)
             {
-                var shortChunk = new byte[Header.ShortSectorSizeAsBytes];
-
-                if (shortIndex + Header.ShortSectorSizeAsBytes > b.Length || Header.ShortSectorSizeAsBytes > shortChunk.Length)
-                {
-                    throw new Exception($"Error copying data for short sector ({shortIndex}) - is this file corrupt?");
-                }
-
-                Buffer.BlockCopy(b, shortIndex, shortChunk, 0, Header.ShortSectorSizeAsBytes);
-
+                var shortChunk = new byte[shortSize];
+                Buffer.BlockCopy(b, shortIndex, shortChunk, 0, shortSize);
                 _shortSectors.Add(shortChunk);
-
-                shortIndex += 64;
             }
         }
     }
 
     public Header Header { get; }
 
+    /// <summary>
+    ///     Directory entries in use (empty entries are left out). <see cref="DirectoryEntry.Id" /> is each entry's index
+    ///     in the directory stream.
+    /// </summary>
     public List<DirectoryEntry> Directory { get; }
+
     public int[] Sat { get; }
     public int[] SSat { get; }
 
     public string SourceFile { get; }
 
+    /// <summary>
+    ///     Problems that didn't stop parsing, such as a damaged directory entry or missing SAT sectors.
+    /// </summary>
+    public List<string> ParseErrors { get; } = new List<string>();
+
+    /// <summary>
+    ///     True when <see cref="ParseErrors" /> is not empty.
+    /// </summary>
+    public bool ParsingError => ParseErrors.Count > 0;
+
+    /// <summary>
+    ///     Reads a stream. Streams smaller than <see cref="global::OleCf.Header.MinimumStandardStreamSize" /> are in the mini
+    ///     stream; if the file has no SSAT, null is returned for them.
+    /// </summary>
+    /// <exception cref="OleCfParseException">The stream's sectors can't be read</exception>
     public byte[] GetPayloadForDirectory(DirectoryEntry dir)
     {
-        byte[] payLoadBytes = null;
+        if (dir == null)
+        {
+            throw new ArgumentNullException(nameof(dir));
+        }
+
+        if (dir.DirectorySize < 0)
+        {
+            throw new OleCfParseException($"Invalid size ({dir.DirectorySize}) for directory ({dir.DirectoryName})",
+                -1, "DirectorySize");
+        }
+
+        byte[] b;
 
         if (dir.DirectorySize >= Header.MinimumStandardStreamSize)
         {
-            var b = GetDataFromSat((int) dir.FirstDirectorySectorId);
-
-            payLoadBytes = new byte[dir.DirectorySize];
-
-            if (dir.DirectorySize > b.Length || dir.DirectorySize > payLoadBytes.Length)
-            {
-                throw new Exception($"Error copying payload data for directory ({dir.DirectoryName}) - is this file corrupt?");
-            }
-
-            Buffer.BlockCopy(b, 0, payLoadBytes, 0, dir.DirectorySize);
+            b = GetDataFromSat((int)dir.FirstDirectorySectorId, dir.DirectoryName);
         }
-        else if (Header.SSATFirstSectorId != -2) // SSat array is only initialized if (Header.SSATFirstSectorId != -2)
+        else if (SSat != null)
         {
-            var b = GetDataFromSSat((int) dir.FirstDirectorySectorId);
-
-            payLoadBytes = new byte[dir.DirectorySize];
-
-            if (dir.DirectorySize > b.Length || dir.DirectorySize > payLoadBytes.Length)
+            if (dir.DirectorySize == 0)
             {
-                throw new Exception($"Error copying payload data for directory ({dir.DirectoryName}) - is this file corrupt?");
+                return new byte[0];
             }
-            Buffer.BlockCopy(b, 0, payLoadBytes, 0, dir.DirectorySize);
+
+            b = GetDataFromSSat((int)dir.FirstDirectorySectorId, dir.DirectoryName);
         }
+        else
+        {
+            return null;
+        }
+
+        if (dir.DirectorySize > b.Length)
+        {
+            throw new OleCfParseException(
+                $"Error copying payload data for directory ({dir.DirectoryName}): its size is {dir.DirectorySize} bytes but its sectors hold {b.Length} - is this file corrupt?",
+                -1, "DirectorySize");
+        }
+
+        var payLoadBytes = new byte[dir.DirectorySize];
+        Buffer.BlockCopy(b, 0, payLoadBytes, 0, dir.DirectorySize);
 
         return payLoadBytes;
     }
 
-    private byte[] GetDataFromSat(int sectorNumber)
+    private void ReadMsatSectors()
     {
-        var sn = sectorNumber;
-
-        var runInfo = new List<int>();
-
-        runInfo.Add(sectorNumber);
-
         var sectorSize = Header.SectorSizeAsBytes;
+        var idsPerSector = sectorSize / 4 - 1; // the last slot points to the next MSAT sector
+        var remaining = Header.TotalSATSectors - Header.HeaderMsatEntries;
+        var satIndex = Header.HeaderMsatEntries;
+        var msatSector = Header.MSATFirstSectorId;
+        var visited = new HashSet<int>();
 
-        while (Sat[sn] >= 0)
+        while (remaining > 0)
         {
-            runInfo.Add(Sat[sn]);
-            sn = Sat[sn];
-        }
+            var offset = Header.SectorOffset(msatSector);
 
-        var retBytes = new byte[sectorSize*runInfo.Count];
-
-        var offset = 0;
-        foreach (var i in runInfo)
-        {
-            var index = 512 + sectorSize*i; //header + relative offset
-
-            var readSize = sectorSize;
-
-            if (_rawBytes.Length - index < sectorSize)
+            if (msatSector < 0 || !visited.Add(msatSector) || (long)offset + sectorSize > _rawBytes.Length)
             {
-                readSize = _rawBytes.Length - index;
+                throw new OleCfParseException(
+                    $"MSAT sector {msatSector} is invalid, repeated or past the end of the file, with {remaining} SAT sector ids still to read - is this file corrupt?",
+                    offset, "MSAT");
             }
-            if (readSize > 0)
+
+            var count = Math.Min(remaining, idsPerSector);
+            for (var i = 0; i < count; i++)
             {
-                if (index + readSize > _rawBytes.Length || (sectorSize * offset) + readSize > retBytes.Length)
+                var sectorId = new byte[4];
+                Buffer.BlockCopy(_rawBytes, offset + i * 4, sectorId, 0, 4);
+
+                var satAddr = BitConverter.ToInt32(sectorId, 0);
+                if (satAddr >= 0)
                 {
-                    throw new Exception($"Error copying run information for run ({i}) - is this file corrupt?");
+                    Header.SATSectors[satIndex] = Header.SectorOffset(satAddr);
                 }
 
-                Buffer.BlockCopy(_rawBytes, index, retBytes, sectorSize * offset, readSize);
+                Header.SectorIds.Add(sectorId);
+                satIndex += 1;
             }
 
-                
-            offset += 1;
+            remaining -= count;
+            msatSector = BitConverter.ToInt32(_rawBytes, offset + idsPerSector * 4);
+        }
+    }
+
+    private int[] ReadSat()
+    {
+        var sectorSize = Header.SectorSizeAsBytes;
+        var sat = new int[Header.TotalSATSectors * (sectorSize / 4)];
+
+        for (var i = 0; i < Header.SATSectors.Length; i++)
+        {
+            var offset = Header.SATSectors[i];
+
+            // 0 is the header, so the sector id was missing (or negative)
+            if (offset == 0 || (long)offset + sectorSize > _rawBytes.Length)
+            {
+                ParseErrors.Add(offset == 0
+                    ? $"SAT sector {i} is missing"
+                    : $"SAT sector {i} at 0x{offset:X} is past the end of the file");
+
+                for (var j = 0; j < sectorSize / 4; j++)
+                {
+                    sat[i * (sectorSize / 4) + j] = -1;
+                }
+
+                continue;
+            }
+
+            Buffer.BlockCopy(_rawBytes, offset, sat, i * sectorSize, sectorSize);
+        }
+
+        return sat;
+    }
+
+    private List<DirectoryEntry> ReadDirectory()
+    {
+        var dirBytes = GetDataFromSat(Header.DirectoryStreamFirstSectorId, "Directory");
+
+        var directory = new List<DirectoryEntry>();
+
+        for (var dirIndex = 0; dirIndex + DirectoryEntrySize <= dirBytes.Length; dirIndex += DirectoryEntrySize)
+        {
+            var dBytes = new byte[DirectoryEntrySize];
+            Buffer.BlockCopy(dirBytes, dirIndex, dBytes, 0, DirectoryEntrySize);
+
+            var dirLen = (int)BitConverter.ToInt16(dBytes, 64);
+
+            if (dBytes[66] != 0 && dirLen > 0) //0 is empty directory structure
+            {
+                var d = new DirectoryEntry(dBytes, dirIndex / DirectoryEntrySize);
+
+                foreach (var parseError in d.ParseErrors)
+                {
+                    ParseErrors.Add($"Directory entry {d.Id} ({d.DirectoryName}): {parseError}");
+                }
+
+                directory.Add(d);
+            }
+        }
+
+        return directory;
+    }
+
+    /// <summary>
+    ///     Follows a chain in the SAT and returns the sectors' contents. The last sector may be short if the file is.
+    /// </summary>
+    private byte[] GetDataFromSat(int sectorNumber, string name)
+    {
+        var sectorSize = Header.SectorSizeAsBytes;
+        var chain = FollowChain(Sat, sectorNumber, name, "SAT");
+
+        // Check every sector before allocating, so a corrupt SAT can't make a buffer bigger than the file
+        foreach (var sector in chain)
+        {
+            if (((long)sector + 1) * sectorSize >= _rawBytes.Length)
+            {
+                throw new OleCfParseException(
+                    $"Sector {sector} of '{name}' is past the end of the file - is this file corrupt?",
+                    ((long)sector + 1) * sectorSize, name);
+            }
+        }
+
+        var retBytes = new byte[(long)sectorSize * chain.Count];
+
+        var offset = 0;
+        foreach (var sector in chain)
+        {
+            long index = Header.SectorOffset(sector);
+
+            var readSize = (int)Math.Min(sectorSize, _rawBytes.Length - index);
+            Buffer.BlockCopy(_rawBytes, (int)index, retBytes, offset, readSize);
+
+            offset += sectorSize;
         }
 
         return retBytes;
     }
 
-    private byte[] GetDataFromSSat(int sectorNumber)
+    private byte[] GetDataFromSSat(int sectorNumber, string name)
     {
-        var sn = sectorNumber;
-
-        var runInfo = new List<int>();
-
-        runInfo.Add(sectorNumber);
-
         var sectorSize = Header.ShortSectorSizeAsBytes;
+        var chain = FollowChain(SSat, sectorNumber, name, "SSAT");
 
-        while (SSat[sn] >= 0)
+        foreach (var sector in chain)
         {
-            runInfo.Add(SSat[sn]);
-
-            sn = SSat[sn];
+            if (sector >= _shortSectors.Count)
+            {
+                throw new OleCfParseException(
+                    $"Short sector {sector} of '{name}' is past the end of the mini stream - is this file corrupt?", -1,
+                    name);
+            }
         }
 
-        var retBytes = new byte[sectorSize*runInfo.Count];
+        var retBytes = new byte[sectorSize * chain.Count];
 
         var offset = 0;
-        foreach (var i in runInfo)
+        foreach (var sector in chain)
         {
-            if (sectorSize > _shortSectors[i].Length || (sectorSize * offset) + sectorSize > retBytes.Length)
-            {
-                throw new Exception($"Error copying run information for run ({i}) - is this file corrupt?");
-            }
-
-            Buffer.BlockCopy(_shortSectors[i], 0, retBytes, sectorSize*offset, sectorSize);
-            offset += 1;
+            Buffer.BlockCopy(_shortSectors[sector], 0, retBytes, offset, sectorSize);
+            offset += sectorSize;
         }
 
         return retBytes;
+    }
+
+    /// <summary>
+    ///     Sector ids of a chain, stopping at the first negative entry. Throws on an id outside the table or a loop.
+    /// </summary>
+    private static List<int> FollowChain(int[] table, int first, string name, string tableName)
+    {
+        var chain = new List<int>();
+        var visited = new HashSet<int>();
+        var sector = first;
+
+        while (sector >= 0)
+        {
+            if (sector >= table.Length)
+            {
+                throw new OleCfParseException(
+                    $"Sector {sector} of '{name}' is outside the {tableName} ({table.Length} entries) - is this file corrupt?",
+                    -1, name);
+            }
+
+            if (!visited.Add(sector))
+            {
+                throw new OleCfParseException(
+                    $"The {tableName} chain of '{name}' loops back to sector {sector} - is this file corrupt?", -1,
+                    name);
+            }
+
+            chain.Add(sector);
+            sector = table[sector];
+        }
+
+        if (chain.Count == 0)
+        {
+            throw new OleCfParseException($"'{name}' starts at invalid sector {first}", -1, name);
+        }
+
+        return chain;
     }
 }

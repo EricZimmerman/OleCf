@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <LangVersion>10</LangVersion>
@@ -6,12 +6,11 @@
     <Authors>Eric Zimmerman</Authors>
     <Company>Eric Zimmerman</Company>
     <Product>OLECF parser</Product>
-    <Description>Parses OLECF containers</Description>
+    <Description>Parses OLE compound files (OLECF / CFB), such as jump lists</Description>
     <Copyright>Eric Zimmerman</Copyright>
-    <PackageProjectUrl>https://github.com/EricZimmerman/olecf</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/EricZimmerman/olecf</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/EricZimmerman/OleCf</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/EricZimmerman/OleCf</RepositoryUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <Version>2026.5.0</Version>
     <PackageTags>olecf</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
@@ -22,11 +21,12 @@
   <ItemGroup>
     <None Include="../README.md" Pack="true" PackagePath=""/>
     <None Include="../icon.png" Pack="true" PackagePath=""/>
-    <PackageReference Include="DotNet.ReproducibleBuilds" Version="2.0.2">
+    <InternalsVisibleTo Include="OleCf.Test" />
+    <PackageReference Include="DotNet.ReproducibleBuilds" Version="2.0.5">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="MinVer" Version="7.0.0">
+    <PackageReference Include="MinVer" Version="8.0.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
