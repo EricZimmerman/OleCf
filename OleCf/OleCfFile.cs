@@ -12,7 +12,9 @@ public class OleCfFile
     private const int DirectoryEntrySize = 128;
 
     private readonly byte[] _rawBytes;
-    private readonly List<byte[]> _shortSectors;
+
+    // Contents of the mini stream that are present in the file (shorter than the root entry's size if truncated)
+    private readonly byte[] _miniStream = new byte[0];
 
     /// <summary>
     ///     Parses a compound file.
@@ -53,7 +55,11 @@ public class OleCfFile
         // ENDOFCHAIN (-2) means there is no SSAT; treat any other negative id the same way
         if (Header.SSATFirstSectorId >= 0)
         {
-            var ssatbytes = GetDataFromSat(Header.SSATFirstSectorId, "SSAT");
+            var ssatbytes = GetDataFromSat(Header.SSATFirstSectorId, "SSAT", out var ssatTruncated);
+            if (ssatTruncated)
+            {
+                ParseErrors.Add("The SSAT is truncated (the file ends before its last sector)");
+            }
 
             SSat = new int[ssatbytes.Length / 4];
 
@@ -65,23 +71,18 @@ public class OleCfFile
 
         Directory = ReadDirectory();
 
-        //the Root Entry directory item contains all the sectors we need for small sector stuff, so get the data and cut it up so we can use it later
-        //when we are done we will have a list of byte arrays, each 64 bytes long, that we can string together later based on SSAT
-        _shortSectors = new List<byte[]>();
-
+        //the Root Entry directory item holds the mini stream, which small streams are read from in 64 byte sectors via the SSAT
         var rootDir = Directory.FirstOrDefault(t => t.DirectoryType == DirectoryEntry.DirectoryEntryTypes.RootStorage) ??
                       Directory.FirstOrDefault(t => t.DirectoryName.ToLowerInvariant() == "root entry");
 
         if (rootDir != null && rootDir.DirectorySize > 0)
         {
-            var b = GetDataFromSat((int)rootDir.FirstDirectorySectorId, "Mini stream");
-            var shortSize = Header.ShortSectorSizeAsBytes;
+            _miniStream = GetDataFromSat((int)rootDir.FirstDirectorySectorId, "Mini stream", out var miniTruncated);
 
-            for (var shortIndex = 0; shortIndex + shortSize <= b.Length; shortIndex += shortSize)
+            if (miniTruncated && _miniStream.Length < rootDir.DirectorySize)
             {
-                var shortChunk = new byte[shortSize];
-                Buffer.BlockCopy(b, shortIndex, shortChunk, 0, shortSize);
-                _shortSectors.Add(shortChunk);
+                ParseErrors.Add(
+                    $"The mini stream is truncated: {_miniStream.Length} of {rootDir.DirectorySize} bytes are in the file");
             }
         }
     }
@@ -112,8 +113,11 @@ public class OleCfFile
     /// <summary>
     ///     Reads a stream. Streams smaller than <see cref="global::OleCf.Header.MinimumStandardStreamSize" /> are in the mini
     ///     stream; if the file has no SSAT, null is returned for them.
+    ///     If the file ends before the end of the stream (or the stream's chain is shorter than its size), the bytes
+    ///     that are there are returned, so the result is shorter than <see cref="DirectoryEntry.DirectorySize" />, and
+    ///     the problem is added to <see cref="ParseErrors" />.
     /// </summary>
-    /// <exception cref="OleCfParseException">The stream's sectors can't be read</exception>
+    /// <exception cref="OleCfParseException">The stream's chain loops, or has a sector id outside the table</exception>
     public byte[] GetPayloadForDirectory(DirectoryEntry dir)
     {
         if (dir == null)
@@ -131,7 +135,7 @@ public class OleCfFile
 
         if (dir.DirectorySize >= Header.MinimumStandardStreamSize)
         {
-            b = GetDataFromSat((int)dir.FirstDirectorySectorId, dir.DirectoryName);
+            b = GetDataFromSat((int)dir.FirstDirectorySectorId, dir.DirectoryName, out _);
         }
         else if (SSat != null)
         {
@@ -147,15 +151,22 @@ public class OleCfFile
             return null;
         }
 
-        if (dir.DirectorySize > b.Length)
+        var length = dir.DirectorySize;
+
+        if (length > b.Length)
         {
-            throw new OleCfParseException(
-                $"Error copying payload data for directory ({dir.DirectoryName}): its size is {dir.DirectorySize} bytes but its sectors hold {b.Length} - is this file corrupt?",
-                -1, "DirectorySize");
+            var message =
+                $"Stream '{dir.DirectoryName}' is truncated: {b.Length} of {dir.DirectorySize} bytes are in the file";
+            if (!ParseErrors.Contains(message))
+            {
+                ParseErrors.Add(message);
+            }
+
+            length = b.Length;
         }
 
-        var payLoadBytes = new byte[dir.DirectorySize];
-        Buffer.BlockCopy(b, 0, payLoadBytes, 0, dir.DirectorySize);
+        var payLoadBytes = new byte[length];
+        Buffer.BlockCopy(b, 0, payLoadBytes, 0, length);
 
         return payLoadBytes;
     }
@@ -233,7 +244,11 @@ public class OleCfFile
 
     private List<DirectoryEntry> ReadDirectory()
     {
-        var dirBytes = GetDataFromSat(Header.DirectoryStreamFirstSectorId, "Directory");
+        var dirBytes = GetDataFromSat(Header.DirectoryStreamFirstSectorId, "Directory", out var dirTruncated);
+        if (dirTruncated)
+        {
+            ParseErrors.Add("The directory is truncated (the file ends before its last sector)");
+        }
 
         var directory = new List<DirectoryEntry>();
 
@@ -261,62 +276,83 @@ public class OleCfFile
     }
 
     /// <summary>
-    ///     Follows a chain in the SAT and returns the sectors' contents. The last sector may be short if the file is.
+    ///     Follows a chain in the SAT and returns the contents of its sectors that are in the file. A truncated file
+    ///     gives fewer bytes (the last sector may be partial) and sets truncated.
     /// </summary>
-    private byte[] GetDataFromSat(int sectorNumber, string name)
+    private byte[] GetDataFromSat(int sectorNumber, string name, out bool truncated)
     {
         var sectorSize = Header.SectorSizeAsBytes;
         var chain = FollowChain(Sat, sectorNumber, name, "SAT");
 
-        // Check every sector before allocating, so a corrupt SAT can't make a buffer bigger than the file
-        foreach (var sector in chain)
+        // Only sectors that start inside the file are read, so a corrupt SAT can't make a buffer bigger than the file
+        var present = 0;
+        while (present < chain.Count && ((long)chain[present] + 1) * sectorSize < _rawBytes.Length)
         {
-            if (((long)sector + 1) * sectorSize >= _rawBytes.Length)
-            {
-                throw new OleCfParseException(
-                    $"Sector {sector} of '{name}' is past the end of the file - is this file corrupt?",
-                    ((long)sector + 1) * sectorSize, name);
-            }
+            present += 1;
         }
 
-        var retBytes = new byte[(long)sectorSize * chain.Count];
+        var retBytes = new byte[(long)sectorSize * present];
 
         var offset = 0;
-        foreach (var sector in chain)
+        truncated = present < chain.Count;
+
+        for (var i = 0; i < present; i++)
         {
-            long index = Header.SectorOffset(sector);
+            long index = Header.SectorOffset(chain[i]);
 
             var readSize = (int)Math.Min(sectorSize, _rawBytes.Length - index);
             Buffer.BlockCopy(_rawBytes, (int)index, retBytes, offset, readSize);
 
-            offset += sectorSize;
+            offset += readSize;
+
+            if (readSize < sectorSize)
+            {
+                // Only the last sector in the file can be partial; nothing after it is in the file
+                truncated = i < chain.Count - 1 || truncated;
+                break;
+            }
+        }
+
+        if (offset < retBytes.Length)
+        {
+            Array.Resize(ref retBytes, offset);
         }
 
         return retBytes;
     }
 
+    /// <summary>
+    ///     Follows a chain in the SSAT and returns the contents of its short sectors that are in the mini stream
+    /// </summary>
     private byte[] GetDataFromSSat(int sectorNumber, string name)
     {
         var sectorSize = Header.ShortSectorSizeAsBytes;
         var chain = FollowChain(SSat, sectorNumber, name, "SSAT");
-
-        foreach (var sector in chain)
-        {
-            if (sector >= _shortSectors.Count)
-            {
-                throw new OleCfParseException(
-                    $"Short sector {sector} of '{name}' is past the end of the mini stream - is this file corrupt?", -1,
-                    name);
-            }
-        }
 
         var retBytes = new byte[sectorSize * chain.Count];
 
         var offset = 0;
         foreach (var sector in chain)
         {
-            Buffer.BlockCopy(_shortSectors[sector], 0, retBytes, offset, sectorSize);
-            offset += sectorSize;
+            var start = (long)sector * sectorSize;
+            if (start >= _miniStream.Length)
+            {
+                break;
+            }
+
+            var readSize = (int)Math.Min(sectorSize, _miniStream.Length - start);
+            Buffer.BlockCopy(_miniStream, (int)start, retBytes, offset, readSize);
+            offset += readSize;
+
+            if (readSize < sectorSize)
+            {
+                break;
+            }
+        }
+
+        if (offset < retBytes.Length)
+        {
+            Array.Resize(ref retBytes, offset);
         }
 
         return retBytes;

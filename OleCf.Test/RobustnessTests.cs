@@ -127,7 +127,7 @@ public class RobustnessTests
     }
 
     [Test]
-    public void SectorPastTheEndOfTheFileThrows()
+    public void SectorPastTheEndOfTheFileGivesThePartOfTheStreamBeforeIt()
     {
         // Sector 120 is inside the SAT (128 entries) but past the end of this ~17 KB file
         var builder = Builder();
@@ -135,22 +135,47 @@ public class RobustnessTests
         Write(data, builder.SatEntryOffset(builder.FirstSectors["big"]), 120);
 
         var o = new OleCfFile(data, "x");
-        Action act = () => o.GetPayloadForDirectory(o.Directory.Single(t => t.DirectoryName == "big"));
+        var payload = o.GetPayloadForDirectory(o.Directory.Single(t => t.DirectoryName == "big"));
 
-        act.Should().Throw<OleCfParseException>().WithMessage("*past the end of the file*");
+        payload.Should().Equal(CfbBuilder.Data(10000, 2).Take(512));
+        o.ParseErrors.Should().ContainSingle().Which.Should().Be("Stream 'big' is truncated: 512 of 10000 bytes are in the file");
     }
 
     [Test]
-    public void StreamLargerThanItsSectorsThrows()
+    public void StreamLargerThanItsSectorsGivesWhatIsThere()
     {
         var builder = Builder();
         var data = builder.Build();
         Write(data, builder.DirectoryEntryOffset(2) + 120, 20000);
 
         var o = new OleCfFile(data, "x");
-        Action act = () => o.GetPayloadForDirectory(o.Directory.Single(t => t.DirectoryName == "big"));
+        var payload = o.GetPayloadForDirectory(o.Directory.Single(t => t.DirectoryName == "big"));
 
-        act.Should().Throw<OleCfParseException>().Where(e => e.Field == "DirectorySize");
+        // 20 sectors of 512 bytes; the data is followed by the zero padding of its last sector
+        payload.Should().HaveCount(10240);
+        payload.Take(10000).Should().Equal(CfbBuilder.Data(10000, 2));
+        o.ParseErrors.Should().ContainSingle().Which.Should().Contain("10240 of 20000 bytes");
+    }
+
+    [Test]
+    public void TruncatedMiniStreamGivesPartialSmallStreams()
+    {
+        // As in a real truncated jump list: the mini stream's second sector is past the end of the file. "small"
+        // (300 bytes) fills short sectors 0-4 of the mini stream's first 512 byte sector, "tiny" starts in the second
+        var builder = new CfbBuilder().Add("small", CfbBuilder.Data(300, 1)).Add("pad", CfbBuilder.Data(200, 3))
+            .Add("tiny", CfbBuilder.Data(100, 4));
+        var data = builder.Build();
+        var o0 = new OleCfFile(data, "x");
+        var miniFirst = (int)o0.Directory[0].FirstDirectorySectorId;
+        Write(data, builder.SatEntryOffset(miniFirst), 120); // inside the SAT, past the end of the file
+
+        var o = new OleCfFile(data, "x");
+
+        o.ParseErrors.Should().ContainSingle().Which.Should().StartWith("The mini stream is truncated: 512 of");
+        o.GetPayloadForDirectory(o.Directory.Single(t => t.DirectoryName == "small")).Should()
+            .Equal(CfbBuilder.Data(300, 1));
+        o.GetPayloadForDirectory(o.Directory.Single(t => t.DirectoryName == "tiny")).Should().BeEmpty();
+        o.ParseErrors.Should().Contain("Stream 'tiny' is truncated: 0 of 100 bytes are in the file");
     }
 
     [Test]
