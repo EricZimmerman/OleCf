@@ -32,7 +32,7 @@ dotnet pack --configuration Release                           # package includes
 
 ## Tests
 
-- `CorpusTests`: every automatic destination in a local collection of real jump lists that is not in the repo: the `Jump lists and lnks` folder next to the repository, or `JUMPLIST_CORPUS`. Skipped when it is missing (as in CI). Every stream in it (24,866) was checked against olefile, including a truncated file (`Tom/.../9b9cdc69c1c24e2b`).
+- `CorpusTests`: every automatic destination in a local collection of real jump lists that is not in the repo: the `Jump lists and lnks` folder in `Corpus/` next to the repository (or directly next to it), or `JUMPLIST_CORPUS`. Skipped when it is missing (as in CI). Every stream in it (24,866) was checked against olefile, including a truncated file (`Tom/.../9b9cdc69c1c24e2b`).
 
 - `TestMain`: real jump lists in `OleCf.Test/TestFiles/<OS>/` (copied to the test output). Expected names, sizes and MD5s come from Python's `olefile`.
 - `CfbBuilder`: writes compound files (version 3/4, mini stream, MSAT) for layouts the samples don't have. Its output was checked with `olefile`. `StructureTests` uses it for 4096 byte sectors, 1/2/3 MSAT sectors (10-26 MB) and directory entry offsets. `RobustnessTests` uses it for corruption (loops, bad ids, truncation, bad sizes, random corruption), with a 10 second guard against endless loops. Add regression tests here.

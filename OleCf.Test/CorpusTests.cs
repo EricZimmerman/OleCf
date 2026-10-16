@@ -25,10 +25,16 @@ public class CorpusTests
         var dir = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
         while (dir != null)
         {
-            var candidate = Path.Combine(dir.FullName, "Jump lists and lnks");
-            if (Directory.Exists(candidate))
+            foreach (var candidate in new[]
+                     {
+                         Path.Combine(dir.FullName, "Corpus", "Jump lists and lnks"),
+                         Path.Combine(dir.FullName, "Jump lists and lnks")
+                     })
             {
-                return candidate;
+                if (Directory.Exists(candidate))
+                {
+                    return candidate;
+                }
             }
 
             dir = dir.Parent;
